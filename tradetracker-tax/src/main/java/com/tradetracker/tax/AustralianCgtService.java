@@ -133,6 +133,7 @@ public class AustralianCgtService {
         BigDecimal netAssessableCgt = nonDiscountGainAfterLoss.add(discountedGain);
 
         return new TaxYearCgtSummary(
+            0, // financialYear is set by TaxReportService
             totalGrossGains,
             totalDiscountGains,
             totalCurrentLosses,
@@ -187,6 +188,7 @@ public class AustralianCgtService {
     ) {}
 
     public record TaxYearCgtSummary(
+        int financialYear,
         BigDecimal totalGrossGains,
         BigDecimal totalDiscountableGains,
         BigDecimal totalCurrentYearLosses,

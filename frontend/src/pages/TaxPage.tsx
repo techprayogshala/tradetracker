@@ -10,12 +10,10 @@ import api from '../lib/apiClient'
 
 interface CgtSummary {
   financialYear: number
-  totalCapitalGains: number
+  totalGrossGains: number
   totalDiscountableGains: number
-  totalCapitalLosses: number
-  currentYearLossesApplied: number
+  totalCurrentYearLosses: number
   priorYearLossesApplied: number
-  cgDiscountAmount: number
   netAssessableCgt: number
   lossesCarriedForward: number
 }
@@ -212,23 +210,24 @@ export default function TaxPage() {
 function CgtSummaryCards({ summary }: { summary: CgtSummary }) {
   const net = summary.netAssessableCgt
   const netPositive = net >= 0
+  const discountAmount = summary.totalDiscountableGains * 0.5
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <TaxCard
         label="Gross Capital Gains"
-        value={fmtCcy(summary.totalCapitalGains)}
+        value={fmtCcy(summary.totalGrossGains)}
         icon={<TrendingUp size={15} />}
         positive
       />
       <TaxCard
         label="Capital Losses"
-        value={fmtCcy(summary.totalCapitalLosses)}
+        value={fmtCcy(summary.totalCurrentYearLosses)}
         icon={<TrendingDown size={15} />}
         positive={false}
       />
       <TaxCard
         label="50% CGT Discount"
-        value={`− ${fmtCcy(summary.cgDiscountAmount)}`}
+        value={`− ${fmtCcy(discountAmount)}`}
         icon={<Shield size={15} />}
         neutral
         sub="On assets held > 12 months"
@@ -250,12 +249,13 @@ function CgtSummaryCards({ summary }: { summary: CgtSummary }) {
 // ── CGT Breakdown Table ───────────────────────────────────────────────────────
 
 function CgtBreakdownTable({ summary }: { summary: CgtSummary }) {
+  const discountAmount = summary.totalDiscountableGains * 0.5
   const rows = [
-    { label: 'Total capital gains',            value: summary.totalCapitalGains,         positive: true },
+    { label: 'Total capital gains',            value: summary.totalGrossGains,            positive: true },
     { label: 'of which: discountable gains',   value: summary.totalDiscountableGains,    positive: true, indent: true },
-    { label: 'Less: current year losses',      value: -summary.currentYearLossesApplied, positive: false },
+    { label: 'Less: current year losses',      value: -summary.totalCurrentYearLosses,     positive: false },
     { label: 'Less: prior year losses applied',value: -summary.priorYearLossesApplied,   positive: false },
-    { label: 'Less: 50% CGT discount',         value: -summary.cgDiscountAmount,          positive: false },
+    { label: 'Less: 50% CGT discount',         value: -discountAmount,                  positive: false },
     null, // divider
     { label: 'Net assessable capital gain',    value: summary.netAssessableCgt,           positive: summary.netAssessableCgt >= 0, bold: true },
     { label: 'Losses carried to next year',    value: summary.lossesCarriedForward,       positive: false },

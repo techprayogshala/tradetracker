@@ -41,7 +41,16 @@ public class TaxReportService {
         requireOwnership(keycloakSub, portfolioId);
         List<AustralianCgtService.CgtResult> results =
             fetchDisposals(portfolioId, financialYear).stream().map(this::toResult).toList();
-        return cgtService.summariseTaxYear(results, BigDecimal.ZERO);
+        var summary = cgtService.summariseTaxYear(results, BigDecimal.ZERO);
+        return new AustralianCgtService.TaxYearCgtSummary(
+            financialYear,
+            summary.totalGrossGains(),
+            summary.totalDiscountableGains(),
+            summary.totalCurrentYearLosses(),
+            summary.priorYearLossesApplied(),
+            summary.netAssessableCgt(),
+            summary.lossesCarriedForward()
+        );
     }
 
     // ── CGT Events ────────────────────────────────────────────────────────────
