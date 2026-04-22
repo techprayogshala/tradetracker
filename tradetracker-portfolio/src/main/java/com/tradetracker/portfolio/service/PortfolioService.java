@@ -103,7 +103,7 @@ public class PortfolioService {
     // ── Portfolios ───────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "portfolios", key = "#keycloakSub")
+    // @Cacheable disabled - Redis serialization issues with record types
     public List<PortfolioSummary> listPortfolios(String keycloakSub) {
         return portfolioRepo
             .findByUserKeycloakSubOrderByIsDefaultDescNameAsc(keycloakSub)

@@ -400,7 +400,7 @@ function OpenParcelsTable({ parcels, isLoading }: { parcels: OpenParcel[]; isLoa
                     pos ? 'text-emerald-600' : 'text-red-500')}>
                     {pos ? '+' : ''}{fmtCcy(p.unrealisedGain)}
                     <span className="text-xs ml-1 opacity-70">
-                      ({pos ? '+' : ''}{(p.unrealisedGainPct * 100).toFixed(1)}%)
+                      ({pos ? '+' : ''}{((p.unrealisedGainPct ?? 0) * 100).toFixed(1)}%)
                     </span>
                   </td>
                 </tr>
@@ -449,9 +449,10 @@ function TableLoader({ text }: { text: string }) {
   )
 }
 
-function fmtCcy(value: number, currency = 'AUD') {
+function fmtCcy(value: number | undefined | null, currency = 'AUD') {
+  const num = value ?? 0
   return new Intl.NumberFormat('en-AU', {
     style: 'currency', currency,
     minimumFractionDigits: 2, maximumFractionDigits: 2,
-  }).format(value)
+  }).format(Number.isNaN(num) ? 0 : num)
 }
