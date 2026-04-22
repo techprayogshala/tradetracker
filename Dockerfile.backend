@@ -1,0 +1,54 @@
+# =============================================================================
+# TradeTracker Backend — Multi-stage Maven build
+# =============================================================================
+
+# ── Build stage (use Maven with Java 21) ───────────────────────────────────
+FROM maven:3.9-eclipse-temurin-21 AS builder
+WORKDIR /build
+
+# Copy POMs first
+COPY pom.xml .
+COPY tradetracker-common/pom.xml          tradetracker-common/
+COPY tradetracker-security/pom.xml        tradetracker-security/
+COPY tradetracker-portfolio/pom.xml       tradetracker-portfolio/
+COPY tradetracker-calculation/pom.xml     tradetracker-calculation/
+COPY tradetracker-tax/pom.xml             tradetracker-tax/
+COPY tradetracker-broker/pom.xml          tradetracker-broker/
+COPY tradetracker-marketdata/pom.xml      tradetracker-marketdata/
+COPY tradetracker-notification/pom.xml    tradetracker-notification/
+COPY tradetracker-scheduler/pom.xml       tradetracker-scheduler/
+COPY tradetracker-document/pom.xml        tradetracker-document/
+COPY tradetracker-api/pom.xml             tradetracker-api/
+COPY tradetracker-app/pom.xml             tradetracker-app/
+
+# Copy source
+COPY tradetracker-common/src          tradetracker-common/src
+COPY tradetracker-security/src        tradetracker-security/src
+COPY tradetracker-portfolio/src       tradetracker-portfolio/src
+COPY tradetracker-calculation/src     tradetracker-calculation/src
+COPY tradetracker-tax/src             tradetracker-tax/src
+COPY tradetracker-broker/src          tradetracker-broker/src
+COPY tradetracker-marketdata/src      tradetracker-marketdata/src
+COPY tradetracker-notification/src    tradetracker-notification/src
+COPY tradetracker-scheduler/src       tradetracker-scheduler/src
+COPY tradetracker-document/src        tradetracker-document/src
+COPY tradetracker-api/src             tradetracker-api/src
+COPY tradetracker-app/src             tradetracker-app/src
+
+RUN mvn package -Dmaven.test.skip=true -B --no-transfer-progress
+
+# ── Stage 3: runtime ──────────────────────────────────────────────────────
+FROM eclipse-temurin:21-jdk AS runtime
+WORKDIR /app
+
+COPY --from=builder /build/tradetracker-app/target/tradetracker-app-0.1.0-SNAPSHOT.jar app.jar
+
+EXPOSE 8080
+
+# Virtual threads + sensible JVM flags for containers
+ENTRYPOINT ["java", \
+  "-XX:+UseContainerSupport", \
+  "-XX:MaxRAMPercentage=75.0", \
+  "-XX:+EnableDynamicAgentLoading", \
+  "-Djava.security.egd=file:/dev/./urandom", \
+  "-jar", "app.jar"]

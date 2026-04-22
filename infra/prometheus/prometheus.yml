@@ -1,0 +1,12 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: tradetracker-backend
+    static_configs:
+      - targets: ["backend:8080"]
+    metrics_path: /api/actuator/prometheus
+
+  - job_name: redpanda
+    static_configs:
+      - targets: ["redpanda:9090"]

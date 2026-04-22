@@ -1,0 +1,181 @@
+spring:
+  application:
+    name: tradetracker
+
+  # ── Virtual Threads (Project Loom) ────────────────────────────────────────
+  threads:
+    virtual:
+      enabled: true
+
+  # ── Database ───────────────────────────────────────────────────────────────
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:tradetracker}
+    username: ${DB_USER:tradetracker}
+    password: ${DB_PASSWORD:tradetracker}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: none        # Flyway owns the schema — never let JPA alter it
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+        default_schema: public
+        use_sql_comments: false
+        jdbc:
+          batch_size: 0
+        cache:
+          use_second_level_cache: false
+          use_query_cache: false
+        generate_statistics: false
+
+  # ── Flyway ─────────────────────────────────────────────────────────────────
+  flyway:
+    enabled: true
+    locations:
+      - classpath:db/migration/security
+      - classpath:db/migration/portfolio
+      - classpath:db/migration/calculation
+      - classpath:db/migration/tax
+      - classpath:db/migration/broker
+      - classpath:db/migration/marketdata
+      - classpath:db/migration/notification
+      - classpath:db/migration/scheduler
+      - classpath:db/migration/document
+
+  # ── Redis ──────────────────────────────────────────────────────────────────
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:tradetracker}
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: 300000      # 5 minutes default TTL
+
+  # ── Kafka / Redpanda ───────────────────────────────────────────────────────
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:19092}
+    consumer:
+      group-id: tradetracker
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.tradetracker.*"
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+  # ── RabbitMQ ───────────────────────────────────────────────────────────────
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:tradetracker}
+    password: ${RABBITMQ_PASSWORD:tradetracker}
+    virtual-host: /
+
+  # ── Security / Keycloak ────────────────────────────────────────────────────
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://keycloak:8080/realms/tradetracker/protocol/openid-connect/certs}
+
+  # ── Mail (MailHog in dev) ──────────────────────────────────────────────────
+  mail:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:1025}
+    username: ${SMTP_USER:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail.smtp.auth: false
+      mail.smtp.starttls.enable: false
+
+  # ── Servlet Multipart ───────────────────────────────────────────────────
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+  # ── Quartz Scheduler ──────────────────────────────────────────────────────
+  quartz:
+    job-store-type: memory         # In-memory for now (not cluster-safe)
+    properties:
+      org.quartz.threadPool.threadCount: 10
+
+# ── Server ──────────────────────────────────────────────────────────────────
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+  tomcat:
+    max-swallow-size: -1
+
+# ── Actuator / Management ────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus, metrics
+  endpoint:
+    health:
+      show-details: always
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  tracing:
+    sampling:
+      probability: 1.0           # 100% in dev; drop to 0.1 in prod
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+
+# ── Structured logging → Loki ─────────────────────────────────────────────
+logging:
+  structured:
+    format:
+      console: ecs               # Elastic Common Schema — Loki can parse this directly
+  level:
+    org.springframework.security: DEBUG
+    org.springframework.security.oauth2: DEBUG
+
+# ── MinIO / S3 ────────────────────────────────────────────────────────────
+aws:
+  s3:
+    endpoint: ${AWS_ENDPOINT_URL:http://localhost:9000}
+    region: ${AWS_REGION:ap-southeast-2}
+    access-key: ${AWS_ACCESS_KEY_ID:tradetracker}
+    secret-key: ${AWS_SECRET_ACCESS_KEY:tradetracker}
+    buckets:
+      trade-confirmations: trade-confirmations
+      reports: reports
+      market-data-raw: market-data-raw
+
+# ── Market Data ───────────────────────────────────────────────────────────
+marketdata:
+  alpha-vantage:
+    api-key: ${ALPHA_VANTAGE_API_KEY:demo}
+    base-url: https://www.alphavantage.co/query
+  open-exchange-rates:
+    app-id: ${OPEN_EXCHANGE_RATES_APP_ID:}
+    base-url: https://openexchangerates.org/api
+
+# ── OpenAPI / Swagger UI ─────────────────────────────────────────────────
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    oauth:
+      client-id: tradetracker-frontend
+      realm: tradetracker
+  api-docs:
+    path: /v3/api-docs

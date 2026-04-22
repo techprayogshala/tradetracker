@@ -1,0 +1,56 @@
+# application-test.yml
+# Used by @SpringBootTest with the "test" profile.
+# Database: integration tests use Testcontainers + @DynamicPropertySource.
+# Unit tests (ReturnsCalculationServiceTest, AustralianCgtServiceTest) don't load Spring at all.
+
+spring:
+  flyway:
+    enabled: false            # Testcontainers integration tests re-enable per-test
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 16379             # Non-standard — fast fail if accidentally used
+
+  cache:
+    type: simple              # In-memory cache, no Redis needed
+
+  kafka:
+    bootstrap-servers: 127.0.0.1:19099
+
+  rabbitmq:
+    host: 127.0.0.1
+    port: 25672
+
+  mail:
+    host: 127.0.0.1
+    port: 12525
+
+  quartz:
+    auto-startup: false       # Don't fire scheduler jobs during tests
+
+aws:
+  s3:
+    endpoint: http://127.0.0.1:19000
+    region: ap-southeast-2
+    access-key: test
+    secret-key: test
+    buckets:
+      trade-confirmations: test-confirmations
+      reports: test-reports
+      market-data-raw: test-market-data
+
+marketdata:
+  alpha-vantage:
+    api-key: demo
+    base-url: http://127.0.0.1:18099/alphavantage
+
+logging:
+  level:
+    com.tradetracker: DEBUG
+    org.springframework.security: WARN
+    org.hibernate.SQL: DEBUG

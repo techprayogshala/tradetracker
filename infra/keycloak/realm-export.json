@@ -1,0 +1,40 @@
+{
+  "realm": "tradetracker",
+  "enabled": true,
+  "displayName": "TradeTracker",
+  "sslRequired": "none",
+  "registrationAllowed": true,
+  "loginWithEmailAllowed": true,
+  "resetPasswordAllowed": true,
+  "bruteForceProtected": true,
+  "accessTokenLifespan": 300,
+  "clients": [
+    {
+      "clientId": "tradetracker-frontend",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "redirectUris": ["http://localhost:3000/*", "http://localhost/*"],
+      "webOrigins": ["http://localhost:3000", "http://localhost"],
+      "protocol": "openid-connect",
+      "attributes": { "pkce.code.challenge.method": "S256" }
+    },
+    {
+      "clientId": "tradetracker-backend",
+      "enabled": true,
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "secret": "change-me-in-production",
+      "protocol": "openid-connect"
+    }
+  ],
+  "roles": {
+    "realm": [
+      { "name": "user",  "description": "Standard portfolio user" },
+      { "name": "admin", "description": "Platform administrator" }
+    ]
+  },
+  "defaultRoles": ["user"],
+  "passwordPolicy": "length(12) and upperCase(1) and digits(1) and specialChars(1)"
+}

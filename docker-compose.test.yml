@@ -1,0 +1,207 @@
+version: "3.9"
+
+# =============================================================================
+# TradeTracker — CI / E2E Test Stack
+# Lighter than docker-compose.yml — excludes Grafana/Loki/Tempo/Prometheus.
+# Usage: docker compose -f docker-compose.test.yml up
+# =============================================================================
+
+networks:
+  tradetracker-test:
+
+volumes:
+  postgres_test_data:
+  minio_test_data:
+  redis_test_data:
+
+services:
+
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    container_name: postgres-test
+    environment:
+      POSTGRES_USER: tradetracker
+      POSTGRES_PASSWORD: tradetracker
+      POSTGRES_DB: tradetracker
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - tradetracker-test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tradetracker"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis-test
+    command: redis-server --requirepass tradetracker
+    ports:
+      - "6379:6379"
+    networks:
+      - tradetracker-test
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "tradetracker", "ping"]
+      interval: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio-test
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: tradetracker
+      MINIO_ROOT_PASSWORD: tradetracker
+    volumes:
+      - minio_test_data:/data
+    ports:
+      - "9000:9000"
+    networks:
+      - tradetracker-test
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      retries: 10
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - tradetracker-test
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 tradetracker tradetracker;
+        mc mb --ignore-existing local/trade-confirmations;
+        mc mb --ignore-existing local/reports;
+        mc mb --ignore-existing local/market-data-raw;
+        echo 'MinIO ready';
+      "
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: keycloak-test
+    command: start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: dev-mem
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME: localhost
+    volumes:
+      - ./infra/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    ports:
+      - "8081:8080"
+    networks:
+      - tradetracker-test
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  keycloak-seed:
+    image: curlimages/curl:latest
+    container_name: keycloak-seed
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    networks:
+      - tradetracker-test
+    entrypoint: >
+      /bin/sh -c "
+        TOKEN=$(curl -sf -X POST http://keycloak:8080/realms/master/protocol/openid-connect/token \
+          -d 'grant_type=password&client_id=admin-cli&username=admin&password=admin' \
+          | grep -o '\"access_token\":\"[^\"]*' | cut -d'\"' -f4);
+
+        curl -sf -X POST http://keycloak:8080/admin/realms/tradetracker/users \
+          -H \"Authorization: Bearer $$TOKEN\" \
+          -H 'Content-Type: application/json' \
+          -d '{
+            \"username\": \"e2e@tradetracker.test\",
+            \"email\":    \"e2e@tradetracker.test\",
+            \"enabled\":  true,
+            \"emailVerified\": true,
+            \"credentials\": [{
+              \"type\": \"password\",
+              \"value\": \"E2eTest!2024\",
+              \"temporary\": false
+            }]
+          }';
+
+        echo 'E2E test user seeded';
+      "
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: mailhog-test
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - tradetracker-test
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: backend-test
+    environment:
+      DB_HOST: postgres
+      DB_USER: tradetracker
+      DB_PASSWORD: tradetracker
+      REDIS_HOST: redis
+      REDIS_PASSWORD: tradetracker
+      KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/tradetracker
+      AWS_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: tradetracker
+      AWS_SECRET_ACCESS_KEY: tradetracker
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      RABBITMQ_HOST: localhost   # Not used in test — no RabbitMQ
+      KAFKA_BOOTSTRAP_SERVERS: localhost:9092
+      INTERNAL_JWT_SECRET: test_secret_for_ci_only_not_production
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    networks:
+      - tradetracker-test
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/api/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    container_name: frontend-test
+    environment:
+      VITE_API_BASE_URL: http://localhost:8080/api
+      VITE_KEYCLOAK_URL: http://localhost:8081
+      VITE_KEYCLOAK_REALM: tradetracker
+      VITE_KEYCLOAK_CLIENT_ID: tradetracker-frontend
+    ports:
+      - "3000:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - tradetracker-test
