@@ -32,7 +32,7 @@ public class PerformanceService {
 
     // ── Public API ────────────────────────────────────────────────────────────
 
-    @Cacheable(value = "performance", key = "#portfolioId + '_' + #period")
+    // @Cacheable disabled - Redis serialization issues with record types
     public PerformanceResult getPerformance(UUID portfolioId, String period) {
         DateRange range = resolvePeriod(period);
         log.debug("Computing performance for {} period={} ({} → {})",

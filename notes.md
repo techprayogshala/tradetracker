@@ -26,8 +26,14 @@
    - Added `TradeEvent.TradeType.valueOf(tradeType)` conversion in `listTrades()` method
 
 3. **CgtPdfReportService.java** (`tradetracker-tax/.../CgtPdfReportService.java`):
-   - Changed `buildParams()` from `Map.of()` to `HashMap` (JasperReports modifies the map internally)
-   - Removed Unicode characters (`\u00b7`, `\u2014`) from JasperReports expressions
+   - Changed `buildParams()` return from immutable `Map.of()` to mutable `HashMap` (JasperReports modifies the map internally)
+   - Removed Unicode characters (`\u00b7` middle dot, `\u2014` em-dash) from JasperReports expressions that caused syntax errors
+   - Fixed expression syntax: `"$P{PORTFOLIO} + \" - FY \" + $P{FY}"` instead of literal Unicode
+
+**Errors Fixed**:
+- `org.hibernate.query.sqm.UnknownPathException: Could not interpret attribute 'name' of basic-valued path` (TradeEvent tradeType enum)
+- `net.sf.jasperreports.engine.JRException: Syntax error on token "Invalid Character"` (Unicode in JasperReports)
+- `java.lang.UnsupportedOperationException: ImmutableCollections.uoe` (Map.of() is immutable)
 
 ---
 
