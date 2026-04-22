@@ -4,7 +4,7 @@
 
 ## STAGE 2 CHECKPOINT (2026-04-22)
 
-**Status**: All frontend modules working (Dashboard, Holdings, Trades)
+**Status**: All features working (Dashboard, Holdings, Trades, Tax PDF download)
 
 **Working Features**:
 - Frontend loads and renders
@@ -14,19 +14,20 @@
 - Portfolio creation and viewing
 - Holdings page loads and displays holdings
 - Trades page now works (fixed enum query issue)
+- Tax & CGT PDF download works
 
-**Fix Applied**:
-- **TradeEventRepository.java** (`tradetracker-portfolio/.../repository/TradeEventRepository.java`):
-  - Changed `t.tradeType.name = :type` to `t.tradeType = :type` (tradeType is an enum, not an entity)
-  - Changed parameter type from `String` to `TradeEvent.TradeType`
+**Fixes Applied**:
 
-- **PortfolioService.java** (`tradetracker-portfolio/.../service/PortfolioService.java`):
-  - Added `TradeEvent.TradeType.valueOf(tradeType)` conversion in `listTrades()` method
+1. **TradeEventRepository.java** (`tradetracker-portfolio/.../repository/TradeEventRepository.java`):
+   - Changed `t.tradeType.name = :type` to `t.tradeType = :type` (tradeType is an enum, not an entity)
+   - Changed parameter type from `String` to `TradeEvent.TradeType`
 
-**Error Before Fix**:
-```
-org.hibernate.query.sqm.UnknownPathException: Could not interpret attribute 'name' of basic-valued path 'com.tradetracker.portfolio.entity.TradeEvent(t).tradeType'
-```
+2. **PortfolioService.java** (`tradetracker-portfolio/.../service/PortfolioService.java`):
+   - Added `TradeEvent.TradeType.valueOf(tradeType)` conversion in `listTrades()` method
+
+3. **CgtPdfReportService.java** (`tradetracker-tax/.../CgtPdfReportService.java`):
+   - Changed `buildParams()` from `Map.of()` to `HashMap` (JasperReports modifies the map internally)
+   - Removed Unicode characters (`\u00b7`, `\u2014`) from JasperReports expressions
 
 ---
 

@@ -11,6 +11,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Generates an ATO CGT schedule PDF using the JasperReports programmatic API.
@@ -111,12 +112,12 @@ public class CgtPdfReportService {
 
         // Portfolio name + FY from parameters — must use JRDesignTextField, not staticText
         // JRDesignStaticText renders its text literally: "$P{PORTFOLIO}" would print as-is.
-        b.addElement(paramField("$P{PORTFOLIO} \u00b7 FY $P{FY}", 8, 28, 380, 12, 8, false, Color.WHITE));
+        b.addElement(paramField("$P{PORTFOLIO} + \" - FY \" + $P{FY}", 8, 28, 380, 12, 8, false, Color.WHITE));
         b.addElement(staticText(LocalDate.now().format(DATE_FMT), 600, 28, 162, 12, 8, false, Color.WHITE, null));
 
         // Disclaimer
         b.addElement(staticText(
-            "INDICATIVE ONLY \u2014 verify with a registered tax agent before lodging your return",
+            "INDICATIVE ONLY - verify with a registered tax agent before lodging your return",
             0, 46, PAGE_W, 14, 7, false, AMBER, new Color(0xff, 0xf7, 0xed)));
 
         b.addElement(staticText("Page ", 630, 64, 40, 14, 8, false, Color.GRAY, null));
@@ -191,7 +192,7 @@ public class CgtPdfReportService {
 
         // Footnote
         b.addElement(staticText(
-            "Source: TradeTracker  ·  All amounts in AUD  ·  Australian financial year 1 July – 30 June",
+            "Source: TradeTracker - All amounts in AUD - Australian financial year 1 July - 30 June",
             0, 115, PAGE_W, 12, 7, false, Color.GRAY, null));
 
         d.setSummary(b);
@@ -283,15 +284,15 @@ public class CgtPdfReportService {
             .subtract(s.netAssessableCgt())
             .max(BigDecimal.ZERO);
 
-        return Map.of(
-            "PORTFOLIO", name,
-            "FY",        (fy - 1) + "–" + String.valueOf(fy).substring(2),
-            "GAINS",     aud(s.totalGrossGains()),
-            "LOSSES",    aud(s.totalCurrentYearLosses()),
-            "DISCOUNT",  aud(discount),
-            "NET_CGT",   aud(s.netAssessableCgt()),
-            "CARRIED",   aud(s.lossesCarriedForward())
-        );
+        Map<String, Object> params = new HashMap<>();
+        params.put("PORTFOLIO", name);
+        params.put("FY", (fy - 1) + "-" + String.valueOf(fy).substring(2));
+        params.put("GAINS", aud(s.totalGrossGains()));
+        params.put("LOSSES", aud(s.totalCurrentYearLosses()));
+        params.put("DISCOUNT", aud(discount));
+        params.put("NET_CGT", aud(s.netAssessableCgt()));
+        params.put("CARRIED", aud(s.lossesCarriedForward()));
+        return params;
     }
 
     // ── Data rows ─────────────────────────────────────────────────────────────
