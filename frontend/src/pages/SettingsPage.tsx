@@ -436,7 +436,7 @@ function ImportTab() {
 // =============================================================================
 
 function NotificationsTab() {
-  const { data: prefs = [], isLoading, toggle } = useNotificationPrefs()
+  const { data: prefs = [], isLoading, toggle: toggleMutation } = useNotificationPrefs()
 
   const prefMap = Object.fromEntries(
     prefs.filter((p: NotificationPref) => p.channel === 'EMAIL').map(p => [p.eventType, p.enabled])
