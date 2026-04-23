@@ -38,7 +38,8 @@ public class SecurityConfig {
                 .jwt(jwt -> jwt.jwtAuthenticationConverter(keycloakJwtConverter()))
             )
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .csrf(csrf -> csrf.disable())   // Stateless API — no CSRF needed
+            .csrf(csrf -> csrf.disable())
+            .cors(cors -> {})
             .build();
     }
 

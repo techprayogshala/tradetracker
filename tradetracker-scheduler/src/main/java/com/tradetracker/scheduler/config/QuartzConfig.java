@@ -1,7 +1,6 @@
 package com.tradetracker.scheduler.config;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.quartz.SchedulerFactoryBeanCustomizer;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,11 +17,13 @@ public class QuartzConfig {
     private ApplicationContext applicationContext;
 
     @Bean
-    public SchedulerFactoryBeanCustomizer schedulerFactoryBeanCustomizer() {
-        return schedulerFactoryBean -> {
-            AutowiringSpringBeanJobFactory jobFactory = new AutowiringSpringBeanJobFactory();
-            jobFactory.setApplicationContext(applicationContext);
-            schedulerFactoryBean.setJobFactory(jobFactory);
-        };
+    public SchedulerFactoryBean quartzScheduler() {
+        SchedulerFactoryBean schedulerFactoryBean = new SchedulerFactoryBean();
+        
+        AutowiringSpringBeanJobFactory jobFactory = new AutowiringSpringBeanJobFactory();
+        jobFactory.setApplicationContext(applicationContext);
+        schedulerFactoryBean.setJobFactory(jobFactory);
+        
+        return schedulerFactoryBean;
     }
 }
