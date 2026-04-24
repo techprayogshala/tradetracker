@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
 import { Plus, Search, Download, Upload, TrendingUp, TrendingDown,
-         ArrowLeftRight, DollarSign, X, Loader2 } from 'lucide-react'
+         ArrowLeftRight, DollarSign, X, Loader2, Pencil, Trash2 } from 'lucide-react'
 import clsx from 'clsx'
 import api from '../lib/apiClient'
 
@@ -56,10 +56,38 @@ export default function TradesPage() {
   const qc = useQueryClient()
   const [showForm, setShowForm]     = useState(false)
   const [showUpload, setShowUpload] = useState(false)
+  const [editTrade, setEditTrade] = useState<Trade | null>(null)
+  const [deleteTrade, setDeleteTrade] = useState<Trade | null>(null)
   const [search, setSearch]         = useState('')
   const [typeFilter, setTypeFilter] = useState('')
   const [page, setPage]             = useState(0)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  const deleteMutation = useMutation({
+    mutationFn: (tradeId: string) => api.delete(`/v1/portfolios/${portfolioId}/trades/${tradeId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['trades', portfolioId] })
+      qc.invalidateQueries({ queryKey: ['holdings', portfolioId] })
+      qc.invalidateQueries({ queryKey: ['portfolios'] })
+      setDeleteTrade(null)
+    },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ tradeId, data }: { tradeId: string; data: TradeFormData }) =>
+      api.put(`/v1/portfolios/${portfolioId}/trades/${tradeId}`, {
+        ticker: data.ticker.toUpperCase(), exchange: data.exchange, tradeType: data.tradeType,
+        quantity: parseFloat(data.quantity), price: parseFloat(data.price),
+        fees: parseFloat(data.fees || '0'), currency: data.currency,
+        tradeDate: data.tradeDate, notes: data.notes || undefined,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['trades', portfolioId] })
+      qc.invalidateQueries({ queryKey: ['holdings', portfolioId] })
+      qc.invalidateQueries({ queryKey: ['portfolios'] })
+      setEditTrade(null)
+    },
+  })
 
   const { data, isLoading } = useQuery({
     queryKey: ['trades', portfolioId, search, typeFilter, page],
@@ -133,13 +161,20 @@ export default function TradesPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-xs text-gray-400 border-b border-gray-100">
-                    {['Date','Security','Type','Quantity','Price','Fees','Total','Source'].map(h => (
+                    {['Date','Security','Type','Quantity','Price','Fees','Total','Source',''].map(h => (
                       <th key={h} className="px-5 py-3 text-right first:text-left font-medium whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {data?.content.map(trade => <TradeRow key={trade.id} trade={trade} />)}
+                  {data?.content.map(trade => (
+                    <TradeRow
+                      key={trade.id}
+                      trade={trade}
+                      onEdit={() => setEditTrade(trade)}
+                      onDelete={() => setDeleteTrade(trade)}
+                    />
+                  ))}
                   {data?.content.length === 0 && (
                     <tr><td colSpan={8} className="px-5 py-12 text-center text-gray-400">
                       No trades found. Click "Add trade" to record your first transaction.
@@ -162,10 +197,22 @@ export default function TradesPage() {
       </div>
 
       {showForm && <AddTradeModal portfolioId={portfolioId!} onClose={() => setShowForm(false)} />}
-      {showUpload && (
-        <BulkUploadModal
+      {showUpload && <BulkUploadModal portfolioId={portfolioId!} onClose={() => setShowUpload(false)} />}
+      {editTrade && (
+        <EditTradeModal
+          trade={editTrade}
           portfolioId={portfolioId!}
-          onClose={() => setShowUpload(false)}
+          onClose={() => setEditTrade(null)}
+        />
+      )}
+      {deleteTrade && (
+        <DeleteTradeModal
+          trade={deleteTrade}
+          onClose={() => setDeleteTrade(null)}
+          onConfirm={() => deleteMutation.mutate(deleteTrade.id)}
+          isPending={deleteMutation.isPending}
+          isError={deleteMutation.isError}
+          error={deleteMutation.error}
         />
       )}
     </div>
@@ -174,7 +221,7 @@ export default function TradesPage() {
 
 // ── Trade row ─────────────────────────────────────────────────────────────────
 
-function TradeRow({ trade }: { trade: Trade }) {
+function TradeRow({ trade, onEdit, onDelete }: { trade: Trade; onEdit: () => void; onDelete: () => void }) {
   const isBuy = trade.tradeType === 'BUY'
   const isSell = trade.tradeType === 'SELL'
   const isDividend = trade.tradeType === 'DIVIDEND'
@@ -205,6 +252,16 @@ function TradeRow({ trade }: { trade: Trade }) {
       <td className="px-5 py-3 text-right tabular-nums font-medium text-gray-900">{fmtCcy(trade.totalCost, trade.currency)}</td>
       <td className="px-5 py-3 text-right">
         <span className="text-xs text-gray-400 capitalize">{trade.source.toLowerCase().replace('_', ' ')}</span>
+      </td>
+      <td className="px-5 py-3 text-right">
+        <div className="flex items-center justify-end gap-1">
+          <button onClick={onEdit} className="p-1 text-gray-400 hover:text-blue-600 rounded hover:bg-blue-50">
+            <Pencil size={14} />
+          </button>
+          <button onClick={onDelete} className="p-1 text-gray-400 hover:text-red-600 rounded hover:bg-red-50">
+            <Trash2 size={14} />
+          </button>
+        </div>
       </td>
     </tr>
   )
@@ -694,4 +751,178 @@ function fmtType(t: string) {
 function fmtCcy(value: number, currency = 'AUD') {
   return new Intl.NumberFormat('en-AU', { style:'currency', currency,
     minimumFractionDigits:2, maximumFractionDigits:2 }).format(value)
+}
+
+// ── Edit trade modal ──────────────────────────────────────────────────────────
+
+function EditTradeModal({ trade, portfolioId, onClose }: { trade: Trade; portfolioId: string; onClose: () => void }) {
+  const qc = useQueryClient()
+  const [form, setForm] = useState<TradeFormData>({
+    ticker: trade.ticker, exchange: trade.exchange, tradeType: trade.tradeType,
+    quantity: String(trade.quantity), price: String(trade.price), fees: String(trade.fees),
+    currency: trade.currency, tradeDate: trade.tradeDate, notes: trade.notes || '',
+  })
+  const [errors, setErrors] = useState<Partial<TradeFormData>>({})
+
+  const mutation = useMutation({
+    mutationFn: (d: TradeFormData) => api.put(`/v1/portfolios/${portfolioId}/trades/${trade.id}`, {
+      ticker: d.ticker.toUpperCase(), exchange: d.exchange, tradeType: d.tradeType,
+      quantity: parseFloat(d.quantity), price: parseFloat(d.price),
+      fees: parseFloat(d.fees || '0'), currency: d.currency,
+      tradeDate: d.tradeDate, notes: d.notes || undefined,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['trades', portfolioId] })
+      qc.invalidateQueries({ queryKey: ['holdings', portfolioId] })
+      qc.invalidateQueries({ queryKey: ['portfolios'] })
+      onClose()
+    },
+  })
+
+  const set = (field: keyof TradeFormData) => (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => { setForm(f => ({ ...f, [field]: e.target.value })); setErrors(e => ({ ...e, [field]: undefined })) }
+
+  const validate = () => {
+    const errs: Partial<TradeFormData> = {}
+    if (!form.ticker.trim()) errs.ticker = 'Required'
+    if (!form.quantity || Number(form.quantity) <= 0) errs.quantity = 'Must be > 0'
+    if (form.price === '' || Number(form.price) < 0) errs.price = 'Must be ≥ 0'
+    if (!form.tradeDate) errs.tradeDate = 'Required'
+    setErrors(errs)
+    return Object.keys(errs).length === 0
+  }
+
+  const totalCost = (parseFloat(form.quantity) || 0) * (parseFloat(form.price) || 0) + (parseFloat(form.fees) || 0)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h2 className="text-lg font-semibold">Edit Trade</h2>
+          <button onClick={onClose}><X size={20} className="text-gray-400 hover:text-gray-600" /></button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Ticker" error={errors.ticker}>
+              <input type="text" value={form.ticker} onChange={set('ticker')} className={inputCls(!!errors.ticker)} />
+            </Field>
+            <Field label="Exchange">
+              <select value={form.exchange} onChange={set('exchange')} className={inputCls()}>
+                {EXCHANGES.map(e => <option key={e} value={e}>{e}</option>)}
+              </select>
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Type">
+              <select value={form.tradeType} onChange={set('tradeType')} className={inputCls()}>
+                {TRADE_TYPES.map(t => <option key={t} value={t}>{fmtType(t)}</option>)}
+              </select>
+            </Field>
+            <Field label="Currency">
+              <select value={form.currency} onChange={set('currency')} className={inputCls()}>
+                {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <Field label="Quantity" error={errors.quantity}>
+              <input type="number" value={form.quantity} onChange={set('quantity')} className={inputCls(!!errors.quantity)} />
+            </Field>
+            <Field label="Price" error={errors.price}>
+              <input type="number" step="0.01" value={form.price} onChange={set('price')} className={inputCls(!!errors.price)} />
+            </Field>
+            <Field label="Fees">
+              <input type="number" step="0.01" value={form.fees} onChange={set('fees')} className={inputCls()} />
+            </Field>
+          </div>
+
+          <Field label="Trade date" error={errors.tradeDate}>
+            <input type="date" value={form.tradeDate} onChange={set('tradeDate')} className={inputCls(!!errors.tradeDate)} />
+          </Field>
+
+          <Field label="Notes (optional)">
+            <textarea value={form.notes} onChange={set('notes')} rows={2} className={inputCls() + ' resize-none'} />
+          </Field>
+
+          {totalCost > 0 && (
+            <div className="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-xl">
+              <span className="text-sm text-gray-500">Total {form.tradeType === 'SELL' ? 'proceeds' : 'cost'}</span>
+              <span className="text-base font-semibold text-gray-900">{fmtCcy(totalCost, form.currency)}</span>
+            </div>
+          )}
+
+          {mutation.isError && (
+            <div className="px-4 py-3 bg-red-50 text-red-700 text-sm rounded-xl">
+              {(mutation.error as any)?.response?.data?.detail ?? 'Something went wrong'}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-100">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">Cancel</button>
+          <button onClick={() => validate() && mutation.mutate(form)} disabled={mutation.isPending}
+            className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-60">
+            {mutation.isPending && <Loader2 size={14} className="animate-spin" />}
+            {mutation.isPending ? 'Saving…' : 'Save changes'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Delete trade modal ─────────────────────────────────────────────────────────
+
+function DeleteTradeModal({ trade, onClose, onConfirm, isPending, isError, error }: {
+  trade: Trade
+  onClose: () => void
+  onConfirm: () => void
+  isPending: boolean
+  isError: boolean
+  error: any
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h2 className="text-lg font-semibold text-red-600">Delete Trade</h2>
+          <button onClick={onClose}><X size={20} className="text-gray-400 hover:text-gray-600" /></button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <p className="text-gray-600">
+            Are you sure you want to delete this trade?
+          </p>
+          <div className="p-4 bg-gray-50 rounded-xl space-y-1">
+            <div className="flex justify-between"><span className="text-gray-500">Ticker</span><span className="font-medium">{trade.ticker}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Type</span><span className="font-medium">{trade.tradeType}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Quantity</span><span className="font-medium">{trade.quantity}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Price</span><span className="font-medium">{fmtCcy(trade.price, trade.currency)}</span></div>
+          </div>
+          <p className="text-sm text-red-500">This will also delete any associated tax parcels.</p>
+
+          {isError && (
+            <div className="px-4 py-3 bg-red-50 text-red-700 text-sm rounded-xl">
+              {error?.response?.data?.detail ?? 'Delete failed'}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-100">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">Cancel</button>
+          <button onClick={onConfirm} disabled={isPending}
+            className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-60">
+            {isPending && <Loader2 size={14} className="animate-spin" />}
+            {isPending ? 'Deleting…' : 'Delete trade'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }

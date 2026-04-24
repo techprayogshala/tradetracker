@@ -8,7 +8,7 @@ import './index.css'
 
 // ── Keycloak init (singleton) ───────────────────────────────────────────────
 declare global {
-  interface Window { _keycloak?: Keycloak }
+  interface Window { _keycloak?: Keycloak; _authReady?: boolean }
 }
 
 const keycloak: Keycloak = window._keycloak ?? new Keycloak({

@@ -299,6 +299,39 @@ public class PortfolioService {
         return trade;
     }
 
+    @CacheEvict(value = "portfolios", allEntries = true)
+    public void deleteTrade(String keycloakSub, UUID portfolioId, UUID tradeId) {
+        requirePortfolio(keycloakSub, portfolioId);
+        
+        TradeEvent trade = tradeRepo.findByIdWithDetails(tradeId, portfolioId)
+            .orElseThrow(() -> new IllegalArgumentException("Trade not found"));
+        
+        // Delete associated parcels and disposals
+        parcelRepo.deleteByTradeId(tradeId);
+        
+        tradeRepo.delete(trade);
+    }
+
+    public TradeEvent updateTrade(String keycloakSub, UUID portfolioId, UUID tradeId, TradeCommand cmd) {
+        requirePortfolio(keycloakSub, portfolioId);
+        
+        TradeEvent trade = tradeRepo.findByIdWithDetails(tradeId, portfolioId)
+            .orElseThrow(() -> new IllegalArgumentException("Trade not found"));
+        
+        trade.setTradeType(TradeEvent.TradeType.valueOf(cmd.tradeType()));
+        trade.setQuantity(cmd.quantity());
+        trade.setPrice(cmd.price());
+        trade.setFees(cmd.fees());
+        trade.setCurrency(cmd.currency());
+        trade.setFxRateToBase(cmd.fxRateToBase());
+        trade.setTradeDate(cmd.tradeDate());
+        trade.setSettlementDate(cmd.settlementDate());
+        trade.setNotes(cmd.notes());
+        trade.setExternalRef(cmd.externalRef());
+        
+        return tradeRepo.save(trade);
+    }
+
     // ── Parcel operations ────────────────────────────────────────────────────
 
     private void createParcel(Portfolio portfolio, Security security, TradeEvent trade) {

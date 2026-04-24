@@ -2,6 +2,7 @@ package com.tradetracker.portfolio.repository;
 
 import com.tradetracker.portfolio.entity.TaxParcel;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -13,6 +14,10 @@ import java.util.UUID;
 
 @Repository
 public interface TaxParcelRepository extends JpaRepository<TaxParcel, UUID> {
+
+    @Modifying
+    @Query(value = "DELETE FROM tax_parcels WHERE source_trade_id = :tradeId", nativeQuery = true)
+    void deleteByTradeId(@Param("tradeId") UUID tradeId);
 
     /**
      * All open parcels for a security in a portfolio, ordered for FIFO by default.

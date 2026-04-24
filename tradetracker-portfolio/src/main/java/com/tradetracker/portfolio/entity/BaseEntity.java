@@ -33,6 +33,8 @@ public abstract class BaseEntity {
     private Instant updatedAt;
 
     public UUID getId()           { return id; }
+    public Long getVersion()     { return version; }
+    public void setVersion(Long v) { this.version = v; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }

@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useKeycloak } from '@react-keycloak/web'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import api from './lib/apiClient'
 import AppLayout from './components/layout/AppLayout'
 import DashboardPage from './pages/DashboardPage'
@@ -11,23 +11,33 @@ import SettingsPage from './pages/SettingsPage'
 
 export default function App() {
   const { keycloak, initialized } = useKeycloak()
+  const [authReady, setAuthReady] = useState(false)
 
+  // Set global auth flag and local state only after token is available
   useEffect(() => {
-    if (!initialized || !keycloak.authenticated) return
-
-    const provision = async () => {
-      try {
-        await api.post('/v1/portfolios/provision')
-      } catch {}
+    if (initialized && keycloak.authenticated) {
+      window._authReady = true
+      setTimeout(() => setAuthReady(true), 100)
     }
-    const timer = setTimeout(provision, 100)
-    return () => clearTimeout(timer)
   }, [initialized, keycloak.authenticated])
 
-  if (!initialized) {
+  // Provision user on first login
+  useEffect(() => {
+    if (!authReady) return
+    const kc = window._keycloak
+    console.log('provision called, kc.token:', kc?.token ? 'EXISTS' : 'MISSING', 'authenticated:', kc?.authenticated)
+    if (!kc?.token) {
+      console.log('NO TOKEN - not calling provision')
+      return
+    }
+    api.post('/v1/portfolios/provision').catch(() => {})
+  }, [authReady])
+
+  // Wait for BOTH initialized AND authenticated before rendering app
+  if (!authReady) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
-        <div className="text-gray-400 text-sm">Loading…</div>
+        <div className="text-gray-400 text-sm">Authenticating...</div>
       </div>
     )
   }

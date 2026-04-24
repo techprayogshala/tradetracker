@@ -44,7 +44,7 @@ interface UserProfile {
 }
 
 interface ParseStatus {
-  documentId: string; parseStatus: string
+  documentId: string; status: string
   brokerDetected: string | null; confidence: number | null
   parsedTrades: string | null; errorMessage: string | null
 }
@@ -315,15 +315,15 @@ function ImportTab() {
   const [dragOver, setDragOver] = useState(false)
   const [docId, setDocId] = useState<string | null>(null)
 
-  const { data: parseStatus } = useQuery({
+const { data: status } = useQuery({
     queryKey: ['doc-status', docId],
     queryFn: async () => {
       const r = await api.get<ParseStatus>(`/v1/documents/${docId}`)
       return r.data
     },
     enabled: !!docId,
-    refetchInterval: (data) =>
-      data?.parseStatus === 'PARSING' || data?.parseStatus === 'PENDING' ? 2000 : false,
+    refetchInterval: (query) =>
+      query.state.data?.status === 'PARSING' || query.state.data?.status === 'PENDING' ? 2000 : false,
   })
 
   const uploadMutation = useMutation({
@@ -346,10 +346,10 @@ function ImportTab() {
   }
 
   const statusIcon = () => {
-    if (!parseStatus) return null
-    if (parseStatus.parseStatus === 'PARSING' || parseStatus.parseStatus === 'PENDING')
+    if (!status) return null
+    if (status.status === 'PARSING' || status.status === 'PENDING')
       return <Loader2 size={16} className="animate-spin text-blue-500" />
-    if (parseStatus.parseStatus === 'PARSED')
+    if (status.status === 'PARSED')
       return <Check size={16} className="text-emerald-600" />
     return <AlertCircle size={16} className="text-red-500" />
   }
@@ -384,11 +384,11 @@ function ImportTab() {
       )}
 
       {/* Parse status */}
-      {parseStatus && (
+      {status && (
         <div className={clsx('mt-3 p-4 rounded-xl border text-sm',
-          parseStatus.parseStatus === 'PARSED'
+          status.status === 'PARSED'
             ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-            : parseStatus.parseStatus === 'FAILED'
+            : status.status === 'FAILED'
             ? 'bg-red-50 border-red-200 text-red-800'
             : 'bg-blue-50 border-blue-200 text-blue-800'
         )}>
@@ -396,25 +396,25 @@ function ImportTab() {
             {statusIcon()}
             <div className="flex-1">
               <p className="font-medium">
-                {parseStatus.parseStatus === 'PARSED' && 'Trade extracted successfully'}
-                {parseStatus.parseStatus === 'PARSING' && 'Parsing in progress…'}
-                {parseStatus.parseStatus === 'PENDING' && 'Queued for parsing…'}
-                {parseStatus.parseStatus === 'FAILED' && 'Parse failed'}
+                {status.status === 'PARSED' && 'Trade extracted successfully'}
+                {status.status === 'PARSING' && 'Parsing in progress…'}
+                {status.status === 'PENDING' && 'Queued for parsing…'}
+                {status.status === 'FAILED' && 'Parse failed'}
               </p>
-              {parseStatus.brokerDetected && (
+              {status.brokerDetected && (
                 <p className="text-xs mt-0.5">
-                  Detected broker: <strong>{parseStatus.brokerDetected}</strong>
-                  {parseStatus.confidence != null && (
+                  Detected broker: <strong>{status.brokerDetected}</strong>
+                  {status.confidence != null && (
                     <span className="ml-2">
-                      ({Math.round(parseStatus.confidence * 100)}% confidence)
+                      ({Math.round(status.confidence * 100)}% confidence)
                     </span>
                   )}
                 </p>
               )}
-              {parseStatus.parseStatus === 'FAILED' && parseStatus.errorMessage && (
-                <p className="text-xs mt-1">{parseStatus.errorMessage}</p>
+              {status.status === 'FAILED' && status.errorMessage && (
+                <p className="text-xs mt-1">{status.errorMessage}</p>
               )}
-              {parseStatus.parseStatus === 'PARSED' && (
+              {status.status === 'PARSED' && (
                 <p className="text-xs mt-1">
                   Review and confirm the extracted trade in the Trades page before it's saved.
                 </p>

@@ -2,6 +2,120 @@
 
 ---
 
+## STAGE 4 CHECKPOINT (2026-04-25)
+
+**Status**: COMPLETE - Edit/Delete trades feature working, Swagger working, auth flow fixed
+
+**New Features (COMPLETE)**:
+- Edit trade modal (EditTradeModal component) ✅
+- Delete trade modal (DeleteTradeModal component) ✅
+- Edit/Delete buttons on each trade row ✅
+- Backend PUT/DELETE endpoints for trades ✅
+
+**Fixes Applied**:
+
+1. **BaseEntity.java** (`tradetracker-portfolio/.../entity/BaseEntity.java`):
+   - Added `getVersion()` and `setVersion(Long)` methods for JPA optimistic locking
+   - Was causing NPE: `Cannot invoke 'java.lang.Long.longValue()' because 'current' is null`
+
+2. **application.yml** (`tradetracker-app/src/main/resources/application.yml`):
+   - Changed Keycloak JWK URI from `http://keycloak:8080` → `http://localhost:8081`
+   - Backend runs locally (outside Docker), needs localhost to reach Keycloak
+   - Docker uses `keycloak:8080`, localhost uses `localhost:8081`
+
+3. **apiClient.ts** (`frontend/src/lib/apiClient.ts`):
+   - Fixed `window._keycloak_` → `window._keycloak` (wrong variable name)
+   - Token wasn't being attached to requests, causing all API calls to fail with 401
+
+4. **App.tsx** (`frontend/src/App.tsx`):
+   - Added `authReady` state that waits for both Keycloak init AND authentication
+   - Only renders the app after auth is confirmed
+   - Shows "Authenticating..." screen until ready
+   - Provision call only fires after authReady is true
+
+5. **usePortfolios.js** (`frontend/src/hooks/usePortfolios.js`):
+   - Simplified - removed redundant auth checks (App.tsx handles auth now)
+   - All hooks use standard React Query patterns without auth guards
+   - Fixed duplicate function declarations (was causing "Identifier already declared" error)
+
+6. **SecurityConfig.java** (`tradetracker-security/.../SecurityConfig.java`):
+   - Added `.cors(cors -> {})` to enable CORS filter for Spring Boot 4.0
+
+7. **springdoc-openapi** (`pom.xml`):
+   - Upgraded from 2.3.0 → 3.0.3 for Spring Boot 4.0 compatibility
+   - Fixed error: `NoSuchMethodError: ControllerAdviceBean.<init>`
+
+8. **SettingsPage.tsx** (`frontend/src/pages/SettingsPage.tsx`):
+   - Fixed `parseStatus` naming conflict with query result
+   - Changed to use `status` field name to avoid collision
+   - Fixed `refetchInterval` callback type error
+
+9. **tsconfig.json** (`frontend/tsconfig.json`):
+   - Added `"types": ["vite/client"]` for `import.meta.env` support
+   - Installed `@types/lodash` for Recharts types
+
+10. **Docker Desktop** troubleshooting:
+    - Reset Docker data: `rm -rf ~/Library/Containers/com.docker.docker/Data`
+    - Fixed Docker config by removing `credsStore: desktop`
+    - Changed context to `desktop-linux`
+
+11. **nginx.conf** (`frontend/nginx.conf`):
+    - Changed proxy from `http://backend:8080` → `http://host.docker.internal:8080`
+
+**Service URLs**:
+- Frontend (Docker): `http://localhost:3002` (Vite dev server with hot reload)
+- Backend API: `http://localhost:8080`
+- Swagger UI: `http://localhost:8080/api/swagger-ui/index.html`
+- Keycloak (Docker internal): `http://keycloak:8080`
+- Keycloak (host): `http://localhost:8081`
+
+**Docker Compose Services**:
+```bash
+docker compose up -d postgres redis keycloak frontend
+```
+
+**Frontend Development**:
+- Docker frontend uses `tradetracker-frontend:dev` image with Vite dev server
+- Source code mounted as volume for hot reload
+- Access at `http://localhost:3002`
+- API calls to `http://backend:8080/api` (inside Docker network)
+
+**Backend Development** (run locally):
+- Start with `mvn spring-boot:run` from `tradetracker-app` directory
+- Connects to Docker Keycloak at `http://localhost:8081`
+- Connects to Docker PostgreSQL at `localhost:5432`
+
+---
+
+## STAGE 3 CHECKPOINT (2026-04-24)
+
+**Status**: Bulk CSV import for trades, drag-and-drop upload, flexible column mapping
+
+**New Features**:
+- Bulk import trades via CSV file upload
+- Drag-and-drop file support
+- Auto-detection of header row (skips non-header rows)
+- Flexible column mapping: recognises various header names like Code/Ticker, Qty/Quantity, Price/Rate, etc.
+- Backend bulk trade endpoint: `POST /v1/portfolios/{id}/trades/bulk`
+
+**Fixes Applied**:
+
+1. **PortfolioController.java** (`tradetracker-api/.../PortfolioController.java`):
+   - Added `/trades/bulk` endpoint accepting array of trades
+   - Iterates and creates each trade via `recordTrade()`
+
+2. **TradesPage.tsx** (`frontend/src/pages/TradesPage.tsx`):
+   - Added `BulkUploadModal` component with CSV parsing
+   - Custom CSV parser handles quoted fields, multiple header names
+   - Auto-finds header row by searching for column indicators
+   - Adds "Import CSV" button next to Export/Add trade buttons
+   - Supports drag-and-drop file upload
+
+3. **SecurityConfig.java** (`tradetracker-security/.../SecurityConfig.java`):
+   - Added `.cors(cors -> {})` to enable CORS filter for Spring Boot 4.0
+
+---
+
 ## STAGE 2 CHECKPOINT (2026-04-22)
 
 **Status**: All features working (Dashboard, Holdings, Trades, Tax PDF download, CORS)

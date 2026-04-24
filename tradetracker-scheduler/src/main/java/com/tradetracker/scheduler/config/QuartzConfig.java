@@ -1,6 +1,6 @@
 package com.tradetracker.scheduler.config;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,10 +11,14 @@ import org.springframework.scheduling.quartz.SchedulerFactoryBean;
  * This is the single change needed to make @Autowired work in all Job classes.
  */
 @Configuration
+@ConditionalOnProperty(name = "spring.quartz.enabled", havingValue = "true", matchIfMissing = true)
 public class QuartzConfig {
 
-    @Autowired
-    private ApplicationContext applicationContext;
+    private final ApplicationContext applicationContext;
+
+    public QuartzConfig(ApplicationContext applicationContext) {
+        this.applicationContext = applicationContext;
+    }
 
     @Bean
     public SchedulerFactoryBean quartzScheduler() {

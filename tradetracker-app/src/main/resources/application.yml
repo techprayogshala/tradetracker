@@ -87,7 +87,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://keycloak:8080/realms/tradetracker/protocol/openid-connect/certs}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8081/realms/tradetracker/protocol/openid-connect/certs}
 
   # ── Mail (MailHog in dev) ──────────────────────────────────────────────────
   mail:

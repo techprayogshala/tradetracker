@@ -161,6 +161,38 @@ public class PortfolioController {
         );
     }
 
+    @DeleteMapping("/{portfolioId}/trades/{tradeId}")
+    @Operation(summary = "Delete a trade by ID")
+    public void deleteTrade(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID portfolioId,
+            @PathVariable UUID tradeId) {
+        svc.deleteTrade(jwt.getSubject(), portfolioId, tradeId);
+    }
+
+    @PutMapping("/{portfolioId}/trades/{tradeId}")
+    @Operation(summary = "Update an existing trade")
+    public TradeDto updateTrade(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID portfolioId,
+            @PathVariable UUID tradeId,
+            @Valid @RequestBody CreateTradeRequest req) {
+        var t = svc.updateTrade(jwt.getSubject(), portfolioId, tradeId, new TradeCommand(
+            req.ticker(), req.exchange(), req.tradeType(),
+            req.quantity(), req.price(), req.fees(), req.currency(), req.fxRateToBase(),
+            req.tradeDate(), req.settlementDate(), req.accountId(), req.externalRef(), req.notes()
+        ));
+        return new TradeDto(
+            t.getId(),
+            t.getSecurity().getTicker(), t.getSecurity().getExchange(),
+            t.getTradeType().name(),
+            t.getQuantity(), t.getPrice(), t.getFees(), t.totalCost(),
+            t.getCurrency(), t.getFxRateToBase(),
+            t.getTradeDate(), t.getSettlementDate(),
+            t.getSource().name(), t.getExternalRef(), t.getNotes()
+        );
+    }
+
     // ── Request / Response DTOs ───────────────────────────────────────────────
 
     public record CreatePortfolioRequest(

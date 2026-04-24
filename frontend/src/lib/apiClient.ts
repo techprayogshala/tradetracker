@@ -11,7 +11,7 @@ const apiClient = axios.create({
 })
 
 apiClient.interceptors.request.use(async (config) => {
-  const kc = window._keycloak_
+  const kc = window._keycloak
   if (!kc?.token) {
     return config
   }
