@@ -4,7 +4,7 @@
 
 ## STAGE 2 CHECKPOINT (2026-04-22)
 
-**Status**: All features working (Dashboard, Holdings, Trades, Tax PDF download)
+**Status**: All features working (Dashboard, Holdings, Trades, Tax PDF download, CORS)
 
 **Working Features**:
 - Frontend loads and renders
@@ -25,7 +25,11 @@
 2. **PortfolioService.java** (`tradetracker-portfolio/.../service/PortfolioService.java`):
    - Added `TradeEvent.TradeType.valueOf(tradeType)` conversion in `listTrades()` method
 
-3. **CgtPdfReportService.java** (`tradetracker-tax/.../CgtPdfReportService.java`):
+3. **SecurityConfig.java** (`tradetracker-security/.../SecurityConfig.java`):
+   - Added `.cors(cors -> {})` to enable CORS filter for Spring Boot 4.0
+   - Without this, the CorsFilter bean in InfrastructureConfig is not wired into SecurityFilterChain
+
+4. **CgtPdfReportService.java** (`tradetracker-tax/.../CgtPdfReportService.java`):
    - Changed `buildParams()` return from immutable `Map.of()` to mutable `HashMap` (JasperReports modifies the map internally)
    - Removed Unicode characters (`\u00b7` middle dot, `\u2014` em-dash) from JasperReports expressions that caused syntax errors
    - Fixed expression syntax: `"$P{PORTFOLIO} + \" - FY \" + $P{FY}"` instead of literal Unicode

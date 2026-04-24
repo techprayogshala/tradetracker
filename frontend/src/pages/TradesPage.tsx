@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
-import { Plus, Search, Download, TrendingUp, TrendingDown,
+import { Plus, Search, Download, Upload, TrendingUp, TrendingDown,
          ArrowLeftRight, DollarSign, X, Loader2 } from 'lucide-react'
 import clsx from 'clsx'
 import api from '../lib/apiClient'
@@ -26,6 +26,19 @@ interface Trade {
 
 interface TradesPage { content: Trade[]; totalElements: number; totalPages: number }
 
+interface CreateTradeRequest {
+  ticker: string; exchange: string; tradeType: string
+  quantity: number; price: number; fees: number
+  currency: string; tradeDate: string; notes?: string
+}
+
+interface TradeDto {
+  id: string; ticker: string; exchange: string; tradeType: string
+  quantity: number; price: number; fees: number; totalCost: number
+  currency: string; fxRateToBase?: number; tradeDate: string; settlementDate?: string
+  source: string; externalRef?: string; notes?: string
+}
+
 interface TradeFormData {
   ticker: string; exchange: string; tradeType: string
   quantity: string; price: string; fees: string
@@ -40,10 +53,13 @@ const CURRENCIES  = ['AUD', 'USD', 'GBP', 'EUR', 'HKD', 'CAD', 'JPY']
 
 export default function TradesPage() {
   const { portfolioId } = useParams<{ portfolioId: string }>()
+  const qc = useQueryClient()
   const [showForm, setShowForm]     = useState(false)
+  const [showUpload, setShowUpload] = useState(false)
   const [search, setSearch]         = useState('')
   const [typeFilter, setTypeFilter] = useState('')
   const [page, setPage]             = useState(0)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['trades', portfolioId, search, typeFilter, page],
@@ -65,6 +81,11 @@ export default function TradesPage() {
           <p className="text-sm text-gray-500 mt-0.5">{data?.totalElements ?? 0} transactions</p>
         </div>
         <div className="flex items-center gap-2">
+          <button onClick={() => setShowUpload(true)}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600
+                       border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <Upload size={14} /> Import CSV
+          </button>
           <button className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600
                              border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
             <Download size={14} /> Export
@@ -141,6 +162,12 @@ export default function TradesPage() {
       </div>
 
       {showForm && <AddTradeModal portfolioId={portfolioId!} onClose={() => setShowForm(false)} />}
+      {showUpload && (
+        <BulkUploadModal
+          portfolioId={portfolioId!}
+          onClose={() => setShowUpload(false)}
+        />
+      )}
     </div>
   )
 }
@@ -206,6 +233,18 @@ function AddTradeModal({ portfolioId, onClose }: { portfolioId: string; onClose:
       qc.invalidateQueries({ queryKey: ['holdings', portfolioId] })
       qc.invalidateQueries({ queryKey: ['portfolios'] })
       onClose()
+    },
+  })
+
+  const bulkMutation = useMutation({
+    mutationFn: async (trades: CreateTradeRequest[]) => {
+      const res = await api.post<TradeDto[]>(`/v1/portfolios/${portfolioId}/trades/bulk`, trades)
+      return res.data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['trades', portfolioId] })
+      qc.invalidateQueries({ queryKey: ['holdings', portfolioId] })
+      qc.invalidateQueries({ queryKey: ['portfolios'] })
     },
   })
 
@@ -327,6 +366,292 @@ function AddTradeModal({ portfolioId, onClose }: { portfolioId: string; onClose:
                        hover:bg-blue-700 disabled:opacity-60 transition-colors">
             {mutation.isPending && <Loader2 size={14} className="animate-spin" />}
             {mutation.isPending ? 'Saving…' : 'Save trade'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function BulkUploadModal({ portfolioId, onClose }: { portfolioId: string; onClose: () => void }) {
+  const qc = useQueryClient()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [file, setFile] = useState<File | null>(null)
+  const [preview, setPreview] = useState<CreateTradeRequest[]>([])
+  const [error, setError] = useState<string | null>(null)
+
+  const mutation = useMutation({
+    mutationFn: async (trades: CreateTradeRequest[]) => {
+      const res = await api.post<TradeDto[]>(`/v1/portfolios/${portfolioId}/trades/bulk`, trades)
+      return res.data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['trades', portfolioId] })
+      qc.invalidateQueries({ queryKey: ['holdings', portfolioId] })
+      qc.invalidateQueries({ queryKey: ['portfolios'] })
+      onClose()
+    },
+  })
+
+  const parseCsv = (text: string) => {
+    const rows: string[][] = []
+    let currentRow: string[] = []
+    let currentCell = ''
+    let inQuotes = false
+    
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i]
+      const nextChar = text[i + 1]
+      
+      if (inQuotes) {
+        if (char === '"' && nextChar === '"') {
+          currentCell += '"'
+          i++
+        } else if (char === '"') {
+          inQuotes = false
+        } else {
+          currentCell += char
+        }
+      } else {
+        if (char === '"') {
+          inQuotes = true
+        } else if (char === ',') {
+          currentRow.push(currentCell.trim())
+          currentCell = ''
+        } else if (char === '\n' || (char === '\r' && nextChar === '\n')) {
+          currentRow.push(currentCell.trim())
+          if (currentRow.some(c => c)) rows.push(currentRow)
+          currentRow = []
+          currentCell = ''
+          if (char === '\r') i++
+        } else if (char !== '\r') {
+          currentCell += char
+        }
+      }
+    }
+    currentRow.push(currentCell.trim())
+    if (currentRow.some(c => c)) rows.push(currentRow)
+    
+    if (rows.length < 2) return []
+    
+    const headerRowIdx = rows.findIndex(r => 
+      r.some(c => /^(code|ticker|qty|quantity|price|date|type)$/i.test(c))
+    )
+    const startIdx = headerRowIdx >= 0 ? headerRowIdx + 1 : 1
+    if (startIdx >= rows.length) return []
+    
+    const headers = rows[startIdx - 1].map(h => h.toLowerCase().replace(/[^a-z0-9]/g, ''))
+    const col = (name: string) => headers.indexOf(name.toLowerCase().replace(/[^a-z0-9]/g, ''))
+    
+    const findCol = (names: string[]) => {
+      for (const n of names) {
+        const idx = col(n)
+        if (idx >= 0) return idx
+      }
+      return -1
+    }
+    
+    const tickerCol = findCol(['code', 'marketcode', 'ticker', 'symbol', 'instrument'])
+    const typeCol = findCol(['type', 'trdtype', 'action', 'side', 'buysell'])
+    const qtyCol = findCol(['qty', 'quantity', 'units', 'shares', 'volume'])
+    const priceCol = findCol(['price', 'rate', 'priceaud'])
+    const dateCol = findCol(['date', 'tradedate', 'transactiondate', 'settledate'])
+    const feesCol = findCol(['brokerage', 'fees', 'commission', 'cost'])
+    const currencyCol = findCol(['instrumentcurrency', 'currency', 'audcurrency', 'tradecurrency'])
+    const nameCol = findCol(['name', 'instrumentname', 'description', 'company'])
+    
+    const trades: CreateTradeRequest[] = []
+    
+    for (let i = startIdx; i < rows.length; i++) {
+      const values = rows[i]
+      const ticker = tickerCol >= 0 ? values[tickerCol] : values[0] || ''
+      const quantity = qtyCol >= 0 ? parseFloat(values[qtyCol] || '0') : parseFloat(values[2] || '0')
+      const price = priceCol >= 0 ? parseFloat(values[priceCol] || '0') : parseFloat(values[3] || '0')
+      
+      if (ticker && quantity > 0 && price > 0) {
+        let tradeType = 'BUY'
+        if (typeCol >= 0) {
+          const t = values[typeCol].toUpperCase()
+          if (t.includes('SELL') || t.includes('SOLD')) tradeType = 'SELL'
+          else if (t.includes('DIV')) tradeType = 'DIVIDEND'
+          else if (t.includes('TRANSFER IN')) tradeType = 'TRANSFER_IN'
+          else if (t.includes('TRANSFER OUT')) tradeType = 'TRANSFER_OUT'
+          else if (t.includes('RETURN')) tradeType = 'RETURN_OF_CAPITAL'
+        }
+        
+        trades.push({
+          ticker: ticker.toUpperCase().trim(),
+          exchange: 'ASX',
+          tradeType,
+          quantity,
+          price,
+          fees: feesCol >= 0 ? parseFloat(values[feesCol] || '0') : 0,
+          currency: currencyCol >= 0 ? values[currencyCol].toUpperCase().trim() : 'AUD',
+          tradeDate: dateCol >= 0 ? values[dateCol] : values[4] || format(new Date(), 'yyyy-MM-dd'),
+          notes: nameCol >= 0 ? values[nameCol] : '',
+        })
+      }
+    }
+    return trades
+  }
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setFile(f)
+    setError(null)
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const text = event.target?.result as string
+      console.log('File loaded, length:', text.length, 'first 200 chars:', text.substring(0, 200))
+      const trades = parseCsv(text)
+      console.log('Parsed trades:', trades.length, trades[0])
+
+      if (trades.length === 0) {
+        setError('No valid trades found. Check CSV format.')
+        setPreview([])
+      } else {
+        const invalid = trades.filter((t) => !t.ticker || t.quantity <= 0 || t.price <= 0)
+        if (invalid.length > 0) {
+          setError(`Found ${invalid.length} invalid rows`)
+          setPreview([])
+        } else {
+          setPreview(trades)
+        }
+      }
+    }
+    reader.onerror = () => setError('Failed to read file')
+    reader.readAsText(f)
+  }
+
+  const handleUpload = () => {
+    if (!preview.length) return
+    mutation.mutate(preview)
+  }
+
+  const isPending = mutation.isPending
+  const isError = mutation.isError
+  const isSuccess = mutation.isSuccess
+  const errorData = mutation.error as any
+  const successData = mutation.data
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h2 className="text-lg font-semibold">Bulk Import Trades</h2>
+          <button onClick={onClose}><X size={20} className="text-gray-400 hover:text-gray-600" /></button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {!file && (
+            <div
+              onClick={() => fileRef.current?.click()}
+              onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
+              onDrop={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                const f = e.dataTransfer.files[0]
+                if (f) {
+                  setFile(f)
+                  setError(null)
+                  const reader = new FileReader()
+                  reader.onload = (ev) => {
+                    const text = ev.target?.result as string
+                    const trades = parseCsv(text)
+                    if (trades.length === 0) {
+                      setError('No valid trades found')
+                      setPreview([])
+                    } else {
+                      const invalid = trades.filter((t) => !t.ticker || t.quantity <= 0 || t.price <= 0)
+                      if (invalid.length > 0) setError(`Found ${invalid.length} invalid rows`)
+                      setPreview(trades)
+                    }
+                  }
+                  reader.onerror = () => setError('Failed to read file')
+                  reader.readAsText(f)
+                }
+              }}
+              className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 transition-colors"
+            >
+              <Upload size={32} className="mx-auto text-gray-300 mb-2" />
+              <p className="text-sm text-gray-500">Click or drag CSV file here</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Required columns: ticker, quantity, price, date
+              </p>
+            </div>
+          )}
+
+          <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFile} />
+
+          {preview.length > 0 && (
+            <>
+              <div className="flex items-center justify-between px-3 py-2 bg-green-50 text-green-700 rounded-lg">
+                <span className="text-sm">{preview.length} trades ready to import</span>
+                <button onClick={() => { setFile(null); setPreview([]) }} className="text-sm underline">Clear</button>
+              </div>
+
+              <div className="max-h-60 overflow-auto border rounded-lg">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Ticker</th>
+                      <th className="px-3 py-2 text-left">Type</th>
+                      <th className="px-3 py-2 text-right">Qty</th>
+                      <th className="px-3 py-2 text-right">Price</th>
+                      <th className="px-3 py-2 text-left">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {preview.slice(0, 20).map((t, i) => (
+                      <tr key={i} className="border-t">
+                        <td className="px-3 py-1.5">{t.ticker}</td>
+                        <td className="px-3 py-1.5">{t.tradeType}</td>
+                        <td className="px-3 py-1.5 text-right">{t.quantity}</td>
+                        <td className="px-3 py-1.5 text-right">{t.price}</td>
+                        <td className="px-3 py-1.5">{t.tradeDate}</td>
+                      </tr>
+                    ))}
+                    {preview.length > 20 && (
+                      <tr><td colSpan={5} className="px-3 py-2 text-center text-gray-400">
+                        ... and {preview.length - 20} more
+                      </td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {error && (
+            <div className="px-4 py-3 bg-red-50 text-red-700 text-sm rounded-xl">{error}</div>
+          )}
+
+          {isError && (
+            <div className="px-4 py-3 bg-red-50 text-red-700 text-sm rounded-xl">
+              {errorData?.response?.data?.detail ?? 'Import failed'}
+            </div>
+          )}
+
+          {isSuccess && (
+            <div className="px-4 py-3 bg-green-50 text-green-700 text-sm rounded-xl">
+              Successfully imported {successData?.length ?? 0} trades
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-100">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">Cancel</button>
+          <button
+            onClick={handleUpload}
+            disabled={!preview.length || isPending}
+            className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-blue-600 rounded-lg
+                       hover:bg-blue-700 disabled:opacity-60 transition-colors"
+          >
+            {isPending && <Loader2 size={14} className="animate-spin" />}
+            {isPending ? 'Importing…' : `Import ${preview.length} trades`}
           </button>
         </div>
       </div>

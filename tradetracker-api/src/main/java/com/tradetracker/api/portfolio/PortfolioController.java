@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -189,6 +190,34 @@ public class PortfolioController {
         String externalRef,
         String notes
     ) {}
+
+    @PostMapping("/{portfolioId}/trades/bulk")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Bulk import trades from array — each trade creates a parcel")
+    public List<TradeDto> bulkCreateTrades(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID portfolioId,
+            @Valid @RequestBody List<CreateTradeRequest> trades) {
+
+        List<TradeDto> results = new ArrayList<>();
+        for (var req : trades) {
+            var t = svc.recordTrade(jwt.getSubject(), portfolioId, new TradeCommand(
+                req.ticker(), req.exchange(), req.tradeType(),
+                req.quantity(), req.price(), req.fees(), req.currency(), req.fxRateToBase(),
+                req.tradeDate(), req.settlementDate(), req.accountId(), req.externalRef(), req.notes()
+            ));
+            results.add(new TradeDto(
+                t.getId(),
+                t.getSecurity().getTicker(), t.getSecurity().getExchange(),
+                t.getTradeType().name(),
+                t.getQuantity(), t.getPrice(), t.getFees(), t.totalCost(),
+                t.getCurrency(), t.getFxRateToBase(),
+                t.getTradeDate(), t.getSettlementDate(),
+                t.getSource().name(), t.getExternalRef(), t.getNotes()
+            ));
+        }
+        return results;
+    }
 
     public record TradeDto(
         UUID id, String ticker, String exchange, String tradeType,
