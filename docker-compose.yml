@@ -283,8 +283,8 @@ services:
     image: tradetracker-frontend:dev
     container_name: frontend
     environment:
-      VITE_API_BASE_URL: http://backend:8080/api
-      VITE_KEYCLOAK_URL: http://keycloak:8080
+      VITE_API_BASE_URL: http://localhost:8080/api
+      VITE_KEYCLOAK_URL: http://localhost:8081
       VITE_KEYCLOAK_REALM: tradetracker
       VITE_KEYCLOAK_CLIENT_ID: tradetracker-frontend
     ports:

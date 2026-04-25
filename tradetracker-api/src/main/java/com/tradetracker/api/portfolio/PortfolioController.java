@@ -170,6 +170,18 @@ public class PortfolioController {
         svc.deleteTrade(jwt.getSubject(), portfolioId, tradeId);
     }
 
+    @DeleteMapping("/{portfolioId}/trades")
+    @Operation(summary = "Delete multiple trades by IDs")
+    public void deleteTrades(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID portfolioId,
+            @RequestParam String ids) {
+        String[] idArray = ids.split(",");
+        for (String id : idArray) {
+            svc.deleteTrade(jwt.getSubject(), portfolioId, UUID.fromString(id.trim()));
+        }
+    }
+
     @PutMapping("/{portfolioId}/trades/{tradeId}")
     @Operation(summary = "Update an existing trade")
     public TradeDto updateTrade(

@@ -14,8 +14,9 @@
       "enabled": true,
       "publicClient": true,
       "standardFlowEnabled": true,
-      "redirectUris": ["http://localhost:3000/*", "http://localhost/*"],
-      "webOrigins": ["http://localhost:3000", "http://localhost"],
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["http://localhost:3000/*", "http://localhost:3002/*", "http://localhost/*"],
+      "webOrigins": ["http://localhost:3000", "http://localhost:3002", "http://localhost"],
       "protocol": "openid-connect",
       "attributes": { "pkce.code.challenge.method": "S256" }
     },
@@ -36,5 +37,23 @@
     ]
   },
   "defaultRoles": ["user"],
-  "passwordPolicy": "length(12) and upperCase(1) and digits(1) and specialChars(1)"
+  "users": [
+    {
+      "username": "demo",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "demo@tradetracker.local",
+      "firstName": "Demo",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Demo123!@#",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["user"]
+    }
+  ],
+  "passwordPolicy": "length(8) and digits(1)"
 }

@@ -5,6 +5,8 @@ declare global {
   interface Window { _keycloak_?: Keycloak }
 }
 
+let tokenRefreshPromise: Promise<void> | null = null
+
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api',
   headers: { 'Content-Type': 'application/json' },
@@ -17,10 +19,12 @@ apiClient.interceptors.request.use(async (config) => {
   }
 
   if (kc.isTokenExpired(30)) {
-    try {
-      await kc.updateToken(30)
-    } catch {
+    if (!tokenRefreshPromise) {
+      tokenRefreshPromise = kc.updateToken(30).finally(() => {
+        tokenRefreshPromise = null
+      })
     }
+    await tokenRefreshPromise
   }
 
   if (kc.token) {

@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
 import { Plus, Search, Download, Upload, TrendingUp, TrendingDown,
-         ArrowLeftRight, DollarSign, X, Loader2, Pencil, Trash2 } from 'lucide-react'
+         ArrowLeftRight, DollarSign, X, Loader2, Pencil, Trash2, CheckSquare, Square } from 'lucide-react'
 import clsx from 'clsx'
 import api from '../lib/apiClient'
 
@@ -27,9 +27,19 @@ interface Trade {
 interface TradesPage { content: Trade[]; totalElements: number; totalPages: number }
 
 interface CreateTradeRequest {
-  ticker: string; exchange: string; tradeType: string
-  quantity: number; price: number; fees: number
-  currency: string; tradeDate: string; notes?: string
+  ticker: string
+  exchange: string
+  tradeType: string
+  quantity: number
+  price: number
+  fees: number
+  currency: string
+  fxRateToBase?: number
+  tradeDate: string
+  settlementDate?: string
+  accountId?: string
+  externalRef?: string
+  notes?: string
 }
 
 interface TradeDto {
@@ -58,6 +68,8 @@ export default function TradesPage() {
   const [showUpload, setShowUpload] = useState(false)
   const [editTrade, setEditTrade] = useState<Trade | null>(null)
   const [deleteTrade, setDeleteTrade] = useState<Trade | null>(null)
+  const [selectedTrades, setSelectedTrades] = useState<Set<string>>(new Set())
+  const [showDeleteMultiple, setShowDeleteMultiple] = useState(false)
   const [search, setSearch]         = useState('')
   const [typeFilter, setTypeFilter] = useState('')
   const [page, setPage]             = useState(0)
@@ -70,6 +82,19 @@ export default function TradesPage() {
       qc.invalidateQueries({ queryKey: ['holdings', portfolioId] })
       qc.invalidateQueries({ queryKey: ['portfolios'] })
       setDeleteTrade(null)
+    },
+  })
+
+  const deleteMultipleMutation = useMutation({
+    mutationFn: async (tradeIds: string[]) => {
+      await api.delete(`/v1/portfolios/${portfolioId}/trades`, { params: { ids: tradeIds.join(',') } })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['trades', portfolioId] })
+      qc.invalidateQueries({ queryKey: ['holdings', portfolioId] })
+      qc.invalidateQueries({ queryKey: ['portfolios'] })
+      setSelectedTrades(new Set())
+      setShowDeleteMultiple(false)
     },
   })
 
@@ -101,6 +126,25 @@ export default function TradesPage() {
     enabled: !!portfolioId,
   })
 
+  const toggleSelectAll = () => {
+    if (!data?.content) return
+    if (selectedTrades.size === data.content.length) {
+      setSelectedTrades(new Set())
+    } else {
+      setSelectedTrades(new Set(data.content.map(t => t.id)))
+    }
+  }
+
+  const toggleSelect = (tradeId: string) => {
+    const newSet = new Set(selectedTrades)
+    if (newSet.has(tradeId)) {
+      newSet.delete(tradeId)
+    } else {
+      newSet.add(tradeId)
+    }
+    setSelectedTrades(newSet)
+  }
+
   return (
     <div className="p-8 space-y-5">
       <div className="flex items-center justify-between">
@@ -109,6 +153,15 @@ export default function TradesPage() {
           <p className="text-sm text-gray-500 mt-0.5">{data?.totalElements ?? 0} transactions</p>
         </div>
         <div className="flex items-center gap-2">
+          {selectedTrades.size > 0 && (
+            <button
+              onClick={() => setShowDeleteMultiple(true)}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm text-red-600
+                         border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+            >
+              <Trash2 size={14} /> Delete ({selectedTrades.size})
+            </button>
+          )}
           <button onClick={() => setShowUpload(true)}
             className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600
                        border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
@@ -161,6 +214,11 @@ export default function TradesPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-xs text-gray-400 border-b border-gray-100">
+                    <th className="px-5 py-3 w-8">
+                      <button onClick={toggleSelectAll} className="text-blue-600 hover:text-blue-800">
+                        {data?.content && selectedTrades.size === data.content.length ? <CheckSquare size={16} /> : <Square size={16} />}
+                      </button>
+                    </th>
                     {['Date','Security','Type','Quantity','Price','Fees','Total','Source',''].map(h => (
                       <th key={h} className="px-5 py-3 text-right first:text-left font-medium whitespace-nowrap">{h}</th>
                     ))}
@@ -171,12 +229,14 @@ export default function TradesPage() {
                     <TradeRow
                       key={trade.id}
                       trade={trade}
+                      isSelected={selectedTrades.has(trade.id)}
+                      onSelect={() => toggleSelect(trade.id)}
                       onEdit={() => setEditTrade(trade)}
                       onDelete={() => setDeleteTrade(trade)}
                     />
                   ))}
                   {data?.content.length === 0 && (
-                    <tr><td colSpan={8} className="px-5 py-12 text-center text-gray-400">
+                    <tr><td colSpan={9} className="px-5 py-12 text-center text-gray-400">
                       No trades found. Click "Add trade" to record your first transaction.
                     </td></tr>
                   )}
@@ -215,18 +275,35 @@ export default function TradesPage() {
           error={deleteMutation.error}
         />
       )}
+      {showDeleteMultiple && (
+        <DeleteMultipleModal
+          count={selectedTrades.size}
+          onClose={() => setShowDeleteMultiple(false)}
+          onConfirm={() => deleteMultipleMutation.mutate(Array.from(selectedTrades))}
+          isPending={deleteMultipleMutation.isPending}
+          isError={deleteMultipleMutation.isError}
+          error={deleteMultipleMutation.error}
+        />
+      )}
     </div>
   )
 }
 
 // ── Trade row ─────────────────────────────────────────────────────────────────
 
-function TradeRow({ trade, onEdit, onDelete }: { trade: Trade; onEdit: () => void; onDelete: () => void }) {
+function TradeRow({ trade, isSelected, onSelect, onEdit, onDelete }: { 
+  trade: Trade; isSelected: boolean; onSelect: () => void; onEdit: () => void; onDelete: () => void 
+}) {
   const isBuy = trade.tradeType === 'BUY'
   const isSell = trade.tradeType === 'SELL'
   const isDividend = trade.tradeType === 'DIVIDEND'
   return (
     <tr className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
+      <td className="px-5 py-3 w-8">
+        <button onClick={onSelect} className="text-blue-600 hover:text-blue-800">
+          {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
+        </button>
+      </td>
       <td className="px-5 py-3 text-gray-500 whitespace-nowrap">{format(parseISO(trade.tradeDate), 'dd MMM yyyy')}</td>
       <td className="px-5 py-3">
         <span className="font-semibold text-gray-900">{trade.ticker}</span>
@@ -451,15 +528,17 @@ function BulkUploadModal({ portfolioId, onClose }: { portfolioId: string; onClos
   })
 
   const parseCsv = (text: string) => {
+    alert('CSV PARSE STARTED!')
+    console.log('=== CSV PARSE STARTED ===')
     const rows: string[][] = []
     let currentRow: string[] = []
     let currentCell = ''
     let inQuotes = false
-    
+
     for (let i = 0; i < text.length; i++) {
       const char = text[i]
       const nextChar = text[i + 1]
-      
+
       if (inQuotes) {
         if (char === '"' && nextChar === '"') {
           currentCell += '"'
@@ -488,18 +567,27 @@ function BulkUploadModal({ portfolioId, onClose }: { portfolioId: string; onClos
     }
     currentRow.push(currentCell.trim())
     if (currentRow.some(c => c)) rows.push(currentRow)
-    
-    if (rows.length < 2) return []
-    
-    const headerRowIdx = rows.findIndex(r => 
-      r.some(c => /^(code|ticker|qty|quantity|price|date|type)$/i.test(c))
+
+    if (rows.length < 2) {
+      alert('parseCsv: Less than 2 rows found')
+      return []
+    }
+
+    // Find header row
+
+    // Find header row - look for columns with meaningful names
+    const headerRowIdx = rows.findIndex(r =>
+      r.some(c => /^(code|ticker|qty|quantity|price|date|type|action)$/i.test(c.trim()))
     )
     const startIdx = headerRowIdx >= 0 ? headerRowIdx + 1 : 1
     if (startIdx >= rows.length) return []
-    
+
+    // Normalize headers for matching
     const headers = rows[startIdx - 1].map(h => h.toLowerCase().replace(/[^a-z0-9]/g, ''))
+    console.log('CSV Headers:', headers)
+    console.log('Header row (raw):', rows[startIdx - 1])
     const col = (name: string) => headers.indexOf(name.toLowerCase().replace(/[^a-z0-9]/g, ''))
-    
+
     const findCol = (names: string[]) => {
       for (const n of names) {
         const idx = col(n)
@@ -507,49 +595,107 @@ function BulkUploadModal({ portfolioId, onClose }: { portfolioId: string; onClos
       }
       return -1
     }
-    
+
     const tickerCol = findCol(['code', 'marketcode', 'ticker', 'symbol', 'instrument'])
-    const typeCol = findCol(['type', 'trdtype', 'action', 'side', 'buysell'])
-    const qtyCol = findCol(['qty', 'quantity', 'units', 'shares', 'volume'])
-    const priceCol = findCol(['price', 'rate', 'priceaud'])
-    const dateCol = findCol(['date', 'tradedate', 'transactiondate', 'settledate'])
-    const feesCol = findCol(['brokerage', 'fees', 'commission', 'cost'])
-    const currencyCol = findCol(['instrumentcurrency', 'currency', 'audcurrency', 'tradecurrency'])
+    const typeCol = findCol(['type', 'trdtype', 'action', 'side', 'buysell', 'tradetype'])
+    console.log('typeCol index:', typeCol)
+    const qtyCol = findCol(['qty', 'quantity', 'units', 'shares', 'volume', 'number'])
+    const priceCol = findCol(['price', 'rate', 'priceaud', 'unitprice', 'amount'])
+    const dateCol = findCol(['date', 'tradedate', 'transactiondate', 'trxdate'])
+    const feesCol = findCol(['brokerage', 'fees', 'commission', 'cost', 'fee'])
+    const currencyCol = findCol(['instrumentcurrency', 'currency', 'audcurrency', 'tradecurrency', 'ccy'])
     const nameCol = findCol(['name', 'instrumentname', 'description', 'company'])
-    
+
     const trades: CreateTradeRequest[] = []
-    
+
     for (let i = startIdx; i < rows.length; i++) {
       const values = rows[i]
-      const ticker = tickerCol >= 0 ? values[tickerCol] : values[0] || ''
-      const quantity = qtyCol >= 0 ? parseFloat(values[qtyCol] || '0') : parseFloat(values[2] || '0')
-      const price = priceCol >= 0 ? parseFloat(values[priceCol] || '0') : parseFloat(values[3] || '0')
-      
-      if (ticker && quantity > 0 && price > 0) {
-        let tradeType = 'BUY'
-        if (typeCol >= 0) {
-          const t = values[typeCol].toUpperCase()
-          if (t.includes('SELL') || t.includes('SOLD')) tradeType = 'SELL'
-          else if (t.includes('DIV')) tradeType = 'DIVIDEND'
-          else if (t.includes('TRANSFER IN')) tradeType = 'TRANSFER_IN'
-          else if (t.includes('TRANSFER OUT')) tradeType = 'TRANSFER_OUT'
-          else if (t.includes('RETURN')) tradeType = 'RETURN_OF_CAPITAL'
+      console.log('Row', i, 'raw values:', values)
+      const tickerRaw = tickerCol >= 0 ? values[tickerCol] : values[0] || ''
+      const ticker = tickerRaw.toUpperCase().trim()
+
+      // Skip empty rows or rows with only whitespace
+      if (!ticker || ticker === '') continue
+
+      // Parse quantity - skip if invalid
+      const qtyRaw = qtyCol >= 0 ? values[qtyCol] : values[2] || '0'
+      const quantity = parseFloat(qtyRaw.replace(/[^0-9.-]/g, ''))
+      if (isNaN(quantity) || quantity <= 0) continue
+
+      // Parse price - skip if invalid
+      const priceRaw = priceCol >= 0 ? values[priceCol] : values[3] || '0'
+      const price = parseFloat(priceRaw.replace(/[^0-9.-]/g, ''))
+      if (isNaN(price) || price <= 0) continue
+
+      // Parse trade type
+      let tradeType = 'BUY' // Default to BUY
+      if (typeCol >= 0) {
+        const typeRaw = values[typeCol].toUpperCase().trim()
+        if (typeRaw.includes('SELL') || typeRaw.includes('SOLD') || typeRaw === 'S') {
+          tradeType = 'SELL'
+        } else if (typeRaw.includes('DIV') || typeRaw.includes('DRIP')) {
+          tradeType = 'DIVIDEND'
+        } else if (typeRaw.includes('TRANSFER IN') || typeRaw === 'TI' || typeRaw.includes('IN')) {
+          tradeType = 'TRANSFER_IN'
+        } else if (typeRaw.includes('TRANSFER OUT') || typeRaw === 'TO' || typeRaw.includes('OUT')) {
+          tradeType = 'TRANSFER_OUT'
+        } else if (typeRaw.includes('RETURN') || typeRaw.includes('ROC')) {
+          tradeType = 'RETURN_OF_CAPITAL'
+        } else if (typeRaw === 'BUY' || typeRaw === 'B') {
+          tradeType = 'BUY'
         }
-        
-        trades.push({
-          ticker: ticker.toUpperCase().trim(),
-          exchange: 'ASX',
-          tradeType,
-          quantity,
-          price,
-          fees: feesCol >= 0 ? parseFloat(values[feesCol] || '0') : 0,
-          currency: currencyCol >= 0 ? values[currencyCol].toUpperCase().trim() : 'AUD',
-          tradeDate: dateCol >= 0 ? values[dateCol] : values[4] || format(new Date(), 'yyyy-MM-dd'),
-          notes: nameCol >= 0 ? values[nameCol] : '',
-        })
+        console.log('Row', i, 'type:', typeRaw, '->', tradeType)
       }
+
+      // Parse date - try various formats
+      let tradeDate = format(new Date(), 'yyyy-MM-dd')
+      if (dateCol >= 0 && values[dateCol]) {
+        const dateRaw = values[dateCol].trim()
+        try {
+          const parsed = parseCSVDate(dateRaw)
+          if (parsed) tradeDate = format(parsed, 'yyyy-MM-dd')
+        } catch {
+          // Use default
+        }
+      }
+
+      // Parse currency
+      const currency = currencyCol >= 0 ? values[currencyCol].toUpperCase().trim().substring(0, 3) : 'AUD'
+
+      // Parse fees
+      const fees = feesCol >= 0 ? parseFloat((values[feesCol] || '0').replace(/[^0-9.-]/g, '')) : 0
+
+      trades.push({
+        ticker,
+        exchange: 'ASX',
+        tradeType,
+        quantity,
+        price,
+        fees: isNaN(fees) ? 0 : fees,
+        currency: /^[A-Z]{3}$/.test(currency) ? currency : 'AUD',
+        tradeDate,
+        notes: nameCol >= 0 ? values[nameCol].trim() : '',
+      })
     }
     return trades
+  }
+
+  const parseCSVDate = (dateStr: string): Date | null => {
+    // Handle DD/MM/YYYY format (Australian)
+    if (/\d{1,2}\/\d{1,2}\/\d{4}/.test(dateStr)) {
+      const parts = dateStr.split('/')
+      return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]))
+    }
+    // Handle YYYY-MM-DD format
+    if (/\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+      return new Date(dateStr)
+    }
+    // Handle DD-MM-YYYY format
+    if (/\d{1,2}-\d{1,2}-\d{4}/.test(dateStr)) {
+      const parts = dateStr.split('-')
+      return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]))
+    }
+    return null
   }
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -920,6 +1066,51 @@ function DeleteTradeModal({ trade, onClose, onConfirm, isPending, isError, error
             className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-60">
             {isPending && <Loader2 size={14} className="animate-spin" />}
             {isPending ? 'Deleting…' : 'Delete trade'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Delete multiple trades modal ──────────────────────────────────────────────
+
+function DeleteMultipleModal({ count, onClose, onConfirm, isPending, isError, error }: {
+  count: number
+  onClose: () => void
+  onConfirm: () => void
+  isPending: boolean
+  isError: boolean
+  error: any
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h2 className="text-lg font-semibold text-red-600">Delete {count} Trades</h2>
+          <button onClick={onClose}><X size={20} className="text-gray-400 hover:text-gray-600" /></button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <p className="text-gray-600">
+            Are you sure you want to delete {count} trades? This action cannot be undone.
+          </p>
+          <p className="text-sm text-red-500">This will also delete any associated tax parcels.</p>
+
+          {isError && (
+            <div className="px-4 py-3 bg-red-50 text-red-700 text-sm rounded-xl">
+              {error?.response?.data?.detail ?? 'Delete failed'}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-100">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">Cancel</button>
+          <button onClick={onConfirm} disabled={isPending}
+            className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-60">
+            {isPending && <Loader2 size={14} className="animate-spin" />}
+            {isPending ? 'Deleting…' : `Delete ${count} trades`}
           </button>
         </div>
       </div>
