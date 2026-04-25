@@ -23,27 +23,25 @@ import java.util.stream.Collectors;
 public class CgtPdfReportService {
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-    private static final String FONT  = "Helvetica";
-    private static final Color  NAVY  = new Color(0x1e, 0x40, 0xaf);
-    private static final Color  STRIPE= new Color(0xf9, 0xfa, 0xfb);
-    private static final Color  AMBER = new Color(0x92, 0x40, 0x0e);
+    private static final String FONT  = "SansSerif";
+private static final Color NAVY  = new Color(0x1e, 0x40, 0xaf);
+    private static final Color AMBER = new Color(0x92, 0x40, 0x0e);
+    private static final Color BORDER = new Color(0xe5, 0xe7, 0xea);
 
     // Column layout: name, x, width
     private static final Object[][] COLS = {
-        {"disposalDate",    0,   72},
-        {"ticker",         72,   52},
-        {"quantity",       124,  48},
-        {"proceeds",       172,  82},
-        {"costBase",       254,  82},
-        {"capitalGain",    336,  82},
-        {"discountApplied",418,  50},
-        {"assessableGain", 468,  82},
-        {"acquisitionDate",550,  72},
-        {"holdingDays",    622,  50},
+        {"disposalDate",    10,   80},
+        {"ticker",        100,   60},
+        {"quantity",      170,   60},
+        {"proceeds",      240,   90},
+        {"costBase",      340,   90},
+        {"capitalGain",   440,   90},
+        {"discountApplied",540,  50},
+        {"assessableGain",600,   90},
     };
-    private static final int PAGE_W = 762;
+    private static final int PAGE_W = 720;
     private static final String[] COL_HEADERS =
-        {"Disposal","Security","Qty","Proceeds","Cost Base","Capital Gain","Disc.","Assessable","Acquired","Days"};
+        {"Disposal Date","Security","Qty","Proceeds","Cost Base","Capital Gain","Disc","Assessable"};
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -70,8 +68,8 @@ public class CgtPdfReportService {
         JasperDesign d = new JasperDesign();
         d.setName("CGT_FY" + fy);
         d.setPageWidth(842); d.setPageHeight(595);   // A4 landscape
-        d.setLeftMargin(40); d.setRightMargin(40);
-        d.setTopMargin(36);  d.setBottomMargin(36);
+        d.setLeftMargin(30); d.setRightMargin(30);
+        d.setTopMargin(25);  d.setBottomMargin(25);
         d.setColumnWidth(PAGE_W);
 
         addParams(d);
@@ -102,26 +100,28 @@ public class CgtPdfReportService {
     // ── Title band ────────────────────────────────────────────────────────────
 
     private void addTitle(JasperDesign d) {
-        JRDesignBand b = band(82);
+        JRDesignBand b = band(50);
 
-        // Blue header bar
-        b.addElement(rect(0, 0, PAGE_W, 34, NAVY, NAVY));
+        // Title text
+        b.addElement(staticText("Capital Gains Tax Schedule", 10, 5, 300, 20, 14, true, NAVY, null));
 
-        // Title text (static)
-        b.addElement(staticText("Capital Gains Tax Report", 8, 6, 500, 22, 14, true, Color.WHITE, null));
-
-        // Portfolio name + FY from parameters — must use JRDesignTextField, not staticText
-        // JRDesignStaticText renders its text literally: "$P{PORTFOLIO}" would print as-is.
-        b.addElement(paramField("$P{PORTFOLIO} + \" - FY \" + $P{FY}", 8, 28, 380, 12, 8, false, Color.WHITE));
-        b.addElement(staticText(LocalDate.now().format(DATE_FMT), 600, 28, 162, 12, 8, false, Color.WHITE, null));
+        // Portfolio name + FY using a simple parameterized field
+        JRDesignTextField ptf = new JRDesignTextField();
+        ptf.setX(10); ptf.setY(25); ptf.setWidth(350); ptf.setHeight(14);
+        ptf.setFontName(FONT); ptf.setFontSize(10f);
+        ptf.setForecolor(Color.DARK_GRAY);
+        JRDesignExpression expr = new JRDesignExpression();
+        expr.setText("$P{PORTFOLIO} + \" - FY \" + $P{FY}");
+        ptf.setExpression(expr);
+        b.addElement(ptf);
+        
+        // Date
+        b.addElement(staticText(LocalDate.now().format(DATE_FMT), 620, 5, 100, 14, 9, false, Color.GRAY, null));
 
         // Disclaimer
         b.addElement(staticText(
-            "INDICATIVE ONLY - verify with a registered tax agent before lodging your return",
-            0, 46, PAGE_W, 14, 7, false, AMBER, new Color(0xff, 0xf7, 0xed)));
-
-        b.addElement(staticText("Page ", 630, 64, 40, 14, 8, false, Color.GRAY, null));
-        b.addElement(variableField("$V{PAGE_NUMBER}", 670, 64, 92, 14, 8, false, Color.GRAY));
+            "INDICATIVE ONLY - Verify with a registered tax agent before lodging",
+            10, 38, 500, 10, 8, false, AMBER, null));
 
         d.setTitle(b);
     }
@@ -129,41 +129,54 @@ public class CgtPdfReportService {
     // ── Column header ──────────────────────────────────────────────────────────
 
     private void addColumnHeader(JasperDesign d) {
-        JRDesignBand b = band(20);
+        JRDesignBand b = band(22);
+        
+        // Header background with border
+        JRDesignRectangle headerBg = new JRDesignRectangle();
+        headerBg.setX(0); headerBg.setY(0); headerBg.setWidth(PAGE_W); headerBg.setHeight(20);
+        headerBg.setMode(ModeEnum.OPAQUE);
+        headerBg.setBackcolor(NAVY);
+        b.addElement(headerBg);
+        
         for (int i = 0; i < COLS.length; i++) {
             int x = (int) COLS[i][1], w = (int) COLS[i][2];
-            JRDesignStaticText t = staticText(COL_HEADERS[i], x, 1, w, 16, 8, true, Color.WHITE, NAVY);
-            t.setMode(ModeEnum.OPAQUE);
+            JRDesignStaticText t = staticText(COL_HEADERS[i], x, 3, w, 16, 9, true, Color.WHITE, null);
+            t.setMode(ModeEnum.TRANSPARENT);
             if (i >= 2) t.setHorizontalTextAlign(HorizontalTextAlignEnum.RIGHT);
             b.addElement(t);
         }
+        
+        // Bottom border
+        JRDesignLine headerLine = new JRDesignLine();
+        headerLine.setX(0); headerLine.setY(20); headerLine.setWidth(PAGE_W); headerLine.setHeight(1);
+        headerLine.setForecolor(BORDER);
+        b.addElement(headerLine);
+        
         d.setColumnHeader(b);
     }
 
     // ── Detail band ───────────────────────────────────────────────────────────
 
     private void addDetail(JasperDesign d) throws JRException {
-        JRDesignBand b = band(15);
-
-        // Alternating stripe background
-        JRDesignRectangle stripe = new JRDesignRectangle();
-        stripe.setX(0); stripe.setY(0); stripe.setWidth(PAGE_W); stripe.setHeight(15);
-        stripe.setMode(ModeEnum.OPAQUE);
-        stripe.setBackcolor(new java.awt.Color(0xf9,0xfa,0xfb));
-        b.addElement(stripe);
-
+        JRDesignBand b = band(18);
+        
+        // Border line for row
+        JRDesignLine rowLine = new JRDesignLine();
+        rowLine.setX(0); rowLine.setY(16); rowLine.setWidth(PAGE_W); rowLine.setHeight(1);
+        rowLine.setForecolor(BORDER);
+        b.addElement(rowLine);
+        
         // Data cells
         for (int i = 0; i < COLS.length; i++) {
             int x = (int) COLS[i][1], w = (int) COLS[i][2];
             String fname = (String) COLS[i][0];
             JRDesignTextField tf = new JRDesignTextField();
-            tf.setX(x); tf.setY(1); tf.setWidth(w); tf.setHeight(13);
-            tf.setFontName(FONT); tf.setFontSize(8f);
+            tf.setX(x); tf.setY(2); tf.setWidth(w); tf.setHeight(14);
+            tf.setFontName(FONT); tf.setFontSize(9f);
             JRDesignExpression expr = new JRDesignExpression();
             expr.setText("$F{" + fname + "}");
             tf.setExpression(expr);
             if (i >= 2) tf.setHorizontalTextAlign(HorizontalTextAlignEnum.RIGHT);
-            // Colour negative capital gains red
             if (fname.equals("capitalGain") || fname.equals("assessableGain")) {
                 tf.setForecolor(java.awt.Color.RED);
             }
@@ -176,24 +189,23 @@ public class CgtPdfReportService {
     // ── Summary band ──────────────────────────────────────────────────────────
 
     private void addSummary(JasperDesign d) {
-        JRDesignBand b = band(130);
+        JRDesignBand b = band(100);
 
         // Divider
-        b.addElement(line(0, 10, PAGE_W));
+        b.addElement(line(0, 0, PAGE_W));
 
-        int y = 20;
-        b.addElement(summaryPair("Total gross capital gains",       "$P{GAINS}",    y, false)); y += 18;
-        b.addElement(summaryPair("Less: current year capital losses","($P{LOSSES})", y, false)); y += 18;
-        b.addElement(summaryPair("Less: 50% CGT discount",          "($P{DISCOUNT})",y, false)); y += 18;
-        b.addElement(line(330, y+2, 432));
-        y += 8;
-        b.addElement(summaryPair("Net assessable capital gain",     "$P{NET_CGT}",  y, true));  y += 22;
-        b.addElement(summaryPair("Losses carried forward",          "$P{CARRIED}",  y, false));
+        int y = 15;
+        b.addElement(summaryPair("Total gross capital gains",       "$P{GAINS}",    y, true)); y += 14;
+        b.addElement(summaryPair("Less: current year capital losses","($P{LOSSES})", y, true)); y += 14;
+        b.addElement(summaryPair("Less: 50% CGT discount",          "($P{DISCOUNT})",y, true)); y += 14;
+        b.addElement(line(300, y, 420)); y += 6;
+        b.addElement(summaryPair("Net assessable capital gain",     "$P{NET_CGT}",  y, true));  y += 14;
+        b.addElement(summaryPair("Losses carried forward",       "$P{CARRIED}",  y, false));
 
         // Footnote
         b.addElement(staticText(
-            "Source: TradeTracker - All amounts in AUD - Australian financial year 1 July - 30 June",
-            0, 115, PAGE_W, 12, 7, false, Color.GRAY, null));
+            "TradeTracker - Australian financial year 1 July - 30 June",
+            10, 85, PAGE_W, 10, 8, false, Color.GRAY, null));
 
         d.setSummary(b);
     }
@@ -251,20 +263,19 @@ public class CgtPdfReportService {
 
     /**
      * Renders a label + value pair in the summary band.
-     * Label on the left half, value right-aligned on the right half.
      */
     private JRDesignFrame summaryPair(String label, String paramExpr, int y, boolean bold) {
         JRDesignFrame frame = new JRDesignFrame();
-        frame.setX(260); frame.setY(y); frame.setWidth(502); frame.setHeight(16);
+        frame.setX(300); frame.setY(y); frame.setWidth(420); frame.setHeight(14);
         frame.setMode(ModeEnum.TRANSPARENT);
 
         // Label
-        JRDesignStaticText lbl = staticText(label, 0, 1, 310, 14, 9, bold, Color.DARK_GRAY, null);
+        JRDesignStaticText lbl = staticText(label, 0, 0, 210, 14, 9, bold, Color.DARK_GRAY, null);
         frame.addElement(lbl);
 
         // Value (from parameter)
         JRDesignTextField val = new JRDesignTextField();
-        val.setX(320); val.setY(1); val.setWidth(182); val.setHeight(14);
+        val.setX(220); val.setY(0); val.setWidth(200); val.setHeight(14);
         val.setFontName(FONT); val.setFontSize(9f); val.setBold(bold);
         val.setHorizontalTextAlign(HorizontalTextAlignEnum.RIGHT);
         JRDesignExpression expr = new JRDesignExpression();
@@ -301,15 +312,13 @@ public class CgtPdfReportService {
         return events.stream().map(e -> {
             Map<String, String> row = new LinkedHashMap<>();
             row.put("disposalDate",   fmt(e.disposalDate()));
-            row.put("ticker",         e.ticker());
-            row.put("quantity",       e.quantity().stripTrailingZeros().toPlainString());
-            row.put("proceeds",       aud(e.proceeds()));
-            row.put("costBase",       aud(e.costBase()));
-            row.put("capitalGain",    audSigned(e.capitalGain()));
+            row.put("ticker",       e.ticker());
+            row.put("quantity",     e.quantity().stripTrailingZeros().toPlainString());
+            row.put("proceeds",    aud(e.proceeds()));
+            row.put("costBase",   aud(e.costBase()));
+            row.put("capitalGain",audSigned(e.capitalGain()));
             row.put("discountApplied",e.discountApplied() ? "50%" : "—");
-            row.put("assessableGain", audSigned(e.assessableGain()));
-            row.put("acquisitionDate",fmt(e.acquisitionDate()));
-            row.put("holdingDays",    String.valueOf(e.holdingDays()));
+            row.put("assessableGain",audSigned(e.assessableGain()));
             return row;
         }).toList();
     }

@@ -81,8 +81,8 @@ public class TaxReportService {
 
         return parcels.stream().map(p -> {
             BigDecimal price   = prices.getOrDefault(p.getSecurity().getId(), BigDecimal.ZERO);
-            BigDecimal mkt     = price.multiply(p.getQuantityRemaining()).setScale(4, RoundingMode.HALF_UP);
-            BigDecimal cost    = p.getCostPerUnit().multiply(p.getQuantityRemaining()).setScale(4, RoundingMode.HALF_UP);
+            BigDecimal mkt     = price.multiply(p.getQuantityRemaining()).setScale(3, RoundingMode.HALF_UP);
+            BigDecimal cost    = p.getCostPerUnit().multiply(p.getQuantityRemaining()).setScale(3, RoundingMode.HALF_UP);
             BigDecimal gain    = mkt.subtract(cost);
             BigDecimal gainPct = cost.compareTo(BigDecimal.ZERO) == 0 ? BigDecimal.ZERO
                 : gain.divide(cost, 6, RoundingMode.HALF_UP);

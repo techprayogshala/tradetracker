@@ -219,15 +219,15 @@ public class PortfolioService {
             Security security    = securities.get(agg.getSecurityId());
             BigDecimal price     = prices.getOrDefault(agg.getSecurityId(), BigDecimal.ZERO);
             BigDecimal marketValue = price.multiply(agg.getTotalQuantity())
-                .setScale(4, RoundingMode.HALF_UP);
-            BigDecimal costBase  = agg.getTotalCostBase().setScale(4, RoundingMode.HALF_UP);
+                .setScale(3, RoundingMode.HALF_UP);
+            BigDecimal costBase  = agg.getTotalCostBase().setScale(3, RoundingMode.HALF_UP);
             BigDecimal gain      = marketValue.subtract(costBase);
             BigDecimal gainPct   = costBase.compareTo(BigDecimal.ZERO) == 0
                 ? BigDecimal.ZERO
-                : gain.divide(costBase, 6, RoundingMode.HALF_UP);
+                : gain.divide(costBase, 3, RoundingMode.HALF_UP);
             BigDecimal avgCost   = agg.getTotalQuantity().compareTo(BigDecimal.ZERO) == 0
                 ? BigDecimal.ZERO
-                : costBase.divide(agg.getTotalQuantity(), 6, RoundingMode.HALF_UP);
+                : costBase.divide(agg.getTotalQuantity(), 3, RoundingMode.HALF_UP);
 
             return new HoldingView(
                 security.getId(),
@@ -439,7 +439,7 @@ public class PortfolioService {
         java.math.BigDecimal gain = alloc.proceedsPerUnit()
             .subtract(parcel.getCostPerUnit())
             .multiply(alloc.quantityToDispose())
-            .setScale(8, java.math.RoundingMode.HALF_UP);
+            .setScale(3, java.math.RoundingMode.HALF_UP);
 
         boolean discountEligible =
             parcel.getAcquisitionDate().plusYears(1).isBefore(sell.getTradeDate());
