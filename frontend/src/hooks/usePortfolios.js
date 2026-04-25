@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import api from '../lib/apiClient';
-
 // ── Portfolios ────────────────────────────────────────────────────────────────
 export function usePortfolios() {
     const [activePortfolio, setActivePortfolio] = useState(null);
@@ -19,7 +18,6 @@ export function usePortfolios() {
     }, [portfolios.length]);
     return { portfolios, activePortfolio, setActivePortfolio, isLoading, error };
 }
-
 export function usePortfolio(portfolioId) {
     return useQuery({
         queryKey: ['portfolio', portfolioId],
@@ -30,7 +28,6 @@ export function usePortfolio(portfolioId) {
         enabled: !!portfolioId,
     });
 }
-
 // ── Holdings ──────────────────────────────────────────────────────────────────
 export function useHoldings(portfolioId) {
     return useQuery({
@@ -44,7 +41,6 @@ export function useHoldings(portfolioId) {
         refetchOnWindowFocus: false,
     });
 }
-
 // ── Performance ───────────────────────────────────────────────────────────────
 export function usePerformance(portfolioId, period = '1Y') {
     return useQuery({
@@ -58,7 +54,6 @@ export function usePerformance(portfolioId, period = '1Y') {
         refetchOnWindowFocus: false,
     });
 }
-
 // ── Trades ────────────────────────────────────────────────────────────────────
 export function useTrades(portfolioId, filters) {
     return useQuery({
@@ -70,7 +65,6 @@ export function useTrades(portfolioId, filters) {
         enabled: !!portfolioId,
     });
 }
-
 export function useCreateTrade(portfolioId) {
     const qc = useQueryClient();
     return useMutation({
@@ -82,7 +76,6 @@ export function useCreateTrade(portfolioId) {
         },
     });
 }
-
 // ── CGT ───────────────────────────────────────────────────────────────────────
 export function useCgtSummary(portfolioId, financialYear) {
     return useQuery({
@@ -94,7 +87,6 @@ export function useCgtSummary(portfolioId, financialYear) {
         enabled: !!portfolioId,
     });
 }
-
 // ── Broker connections ────────────────────────────────────────────────────────
 export function useBrokerConnections() {
     return useQuery({
@@ -105,7 +97,6 @@ export function useBrokerConnections() {
         },
     });
 }
-
 // ── Notification preferences ──────────────────────────────────────────────────
 export function useNotificationPrefs() {
     const qc = useQueryClient();

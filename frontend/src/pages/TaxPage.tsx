@@ -10,7 +10,8 @@ import api from '../lib/apiClient'
 
 interface CgtSummary {
   financialYear: number
-  totalGrossGains: number
+  shortTermGains: number
+  longTermGains: number
   totalDiscountableGains: number
   totalCurrentYearLosses: number
   priorYearLossesApplied: number
@@ -212,35 +213,37 @@ function CgtSummaryCards({ summary }: { summary: CgtSummary }) {
   const netPositive = net >= 0
   const discountAmount = summary.totalDiscountableGains * 0.5
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
       <TaxCard
-        label="Gross Capital Gains"
-        value={fmtCcy(summary.totalGrossGains)}
+        label="Short Term"
+        value={fmtCcy(summary.shortTermGains || 0)}
         icon={<TrendingUp size={15} />}
         positive
       />
       <TaxCard
-        label="Capital Losses"
-        value={fmtCcy(summary.totalCurrentYearLosses)}
+        label="Long Term"
+        value={fmtCcy(summary.longTermGains || 0)}
+        icon={<TrendingUp size={15} />}
+        positive
+      />
+      <TaxCard
+        label="Losses"
+        value={fmtCcy(summary.totalCurrentYearLosses || 0)}
         icon={<TrendingDown size={15} />}
         positive={false}
       />
       <TaxCard
-        label="50% CGT Discount"
+        label="CGT Disc."
         value={`− ${fmtCcy(discountAmount)}`}
         icon={<Shield size={15} />}
         neutral
-        sub="On assets held > 12 months"
       />
       <TaxCard
-        label="Net Assessable CGT"
+        label="Net CGT"
         value={fmtCcy(net)}
         positive={netPositive}
         icon={netPositive ? <TrendingUp size={15} /> : <TrendingDown size={15} />}
         highlight
-        sub={summary.lossesCarriedForward > 0
-          ? `${fmtCcy(summary.lossesCarriedForward)} carried forward`
-          : undefined}
       />
     </div>
   )
@@ -249,16 +252,19 @@ function CgtSummaryCards({ summary }: { summary: CgtSummary }) {
 // ── CGT Breakdown Table ───────────────────────────────────────────────────────
 
 function CgtBreakdownTable({ summary }: { summary: CgtSummary }) {
-  const discountAmount = summary.totalDiscountableGains * 0.5
-  const rows = [
-    { label: 'Total capital gains',            value: summary.totalGrossGains,            positive: true },
+  const discountAmount = (summary.totalDiscountableGains || 0) * 0.5
+  const currentYrLosses = summary.totalCurrentYearLosses || 0
+  const priorLosses = summary.priorYearLossesApplied ?? 0
+  const rows: ({ label: string; value: number; positive?: boolean; indent?: boolean; bold?: boolean } | null)[] = [
+    { label: 'Short term capital gains',    value: summary.shortTermGains || 0,            positive: true },
+    { label: 'Long term capital gains',    value: summary.longTermGains || 0,            positive: true },
     { label: 'of which: discountable gains',   value: summary.totalDiscountableGains,    positive: true, indent: true },
-    { label: 'Less: current year losses',      value: -summary.totalCurrentYearLosses,     positive: false },
-    { label: 'Less: prior year losses applied',value: -summary.priorYearLossesApplied,   positive: false },
+    { label: 'Less: current year losses',      value: -currentYrLosses,     positive: false },
+    { label: 'Less: prior year losses applied',value: -priorLosses,   positive: false },
     { label: 'Less: 50% CGT discount',         value: -discountAmount,                  positive: false },
-    null, // divider
+    null,
     { label: 'Net assessable capital gain',    value: summary.netAssessableCgt,           positive: summary.netAssessableCgt >= 0, bold: true },
-    { label: 'Losses carried to next year',    value: summary.lossesCarriedForward,       positive: false },
+    { label: 'Losses carried to next year',    value: summary.lossesCarriedForward || 0,       positive: false },
   ]
 
   return (

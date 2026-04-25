@@ -89,52 +89,52 @@ public class AustralianCgtService {
             List<CgtResult> results,
             BigDecimal carriedForwardLoss) {
 
-        BigDecimal totalGrossGains      = BigDecimal.ZERO;
-        BigDecimal totalDiscountGains   = BigDecimal.ZERO;   // Pre-discount
-        BigDecimal totalCurrentLosses   = BigDecimal.ZERO;
+        BigDecimal shortTermGains = BigDecimal.ZERO;
+        BigDecimal longTermGains = BigDecimal.ZERO;
+        BigDecimal totalDiscountGains = BigDecimal.ZERO;
+        BigDecimal totalCurrentLosses = BigDecimal.ZERO;
 
         for (CgtResult r : results) {
             if (r.isLoss()) {
                 totalCurrentLosses = totalCurrentLosses.add(r.grossGain().abs());
             } else if (r.discountApplied()) {
+                longTermGains = longTermGains.add(r.grossGain());
                 totalDiscountGains = totalDiscountGains.add(r.grossGain());
             } else {
-                totalGrossGains = totalGrossGains.add(r.grossGain());
+                shortTermGains = shortTermGains.add(r.grossGain());
             }
         }
 
         BigDecimal totalLosses = totalCurrentLosses.add(carriedForwardLoss);
 
-        // Step 1: Apply losses to non-discountable gains first
         BigDecimal lossesRemaining = totalLosses;
-        BigDecimal nonDiscountGainAfterLoss = totalGrossGains.subtract(lossesRemaining);
-        if (nonDiscountGainAfterLoss.compareTo(BigDecimal.ZERO) < 0) {
-            lossesRemaining = nonDiscountGainAfterLoss.abs();
-            nonDiscountGainAfterLoss = BigDecimal.ZERO;
+        BigDecimal shortTermAfterLoss = shortTermGains.subtract(lossesRemaining);
+        if (shortTermAfterLoss.compareTo(BigDecimal.ZERO) < 0) {
+            lossesRemaining = shortTermAfterLoss.abs();
+            shortTermAfterLoss = BigDecimal.ZERO;
         } else {
             lossesRemaining = BigDecimal.ZERO;
         }
 
-        // Step 2: Apply remaining losses to discountable gains (before halving)
-        BigDecimal discountGainAfterLoss = totalDiscountGains.subtract(lossesRemaining);
+        BigDecimal longTermAfterLoss = longTermGains.subtract(lossesRemaining);
         BigDecimal lossCarriedForward;
-        if (discountGainAfterLoss.compareTo(BigDecimal.ZERO) < 0) {
-            lossCarriedForward = discountGainAfterLoss.abs();
-            discountGainAfterLoss = BigDecimal.ZERO;
+        if (longTermAfterLoss.compareTo(BigDecimal.ZERO) < 0) {
+            lossCarriedForward = longTermAfterLoss.abs();
+            longTermAfterLoss = BigDecimal.ZERO;
         } else {
             lossCarriedForward = BigDecimal.ZERO;
         }
 
-        // Step 3: Apply 50% discount to remaining discountable gains
-        BigDecimal discountedGain = discountGainAfterLoss
+        BigDecimal discountedGain = longTermAfterLoss
             .multiply(BigDecimal.ONE.subtract(CGT_DISCOUNT))
             .setScale(SCALE, RM);
 
-        BigDecimal netAssessableCgt = nonDiscountGainAfterLoss.add(discountedGain);
+        BigDecimal netAssessableCgt = shortTermAfterLoss.add(discountedGain);
 
         return new TaxYearCgtSummary(
-            0, // financialYear is set by TaxReportService
-            totalGrossGains,
+            0,
+            shortTermGains,
+            longTermGains,
             totalDiscountGains,
             totalCurrentLosses,
             carriedForwardLoss,
@@ -189,7 +189,8 @@ public class AustralianCgtService {
 
     public record TaxYearCgtSummary(
         int financialYear,
-        BigDecimal totalGrossGains,
+        BigDecimal shortTermGains,
+        BigDecimal longTermGains,
         BigDecimal totalDiscountableGains,
         BigDecimal totalCurrentYearLosses,
         BigDecimal priorYearLossesApplied,

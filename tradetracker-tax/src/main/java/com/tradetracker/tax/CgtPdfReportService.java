@@ -82,7 +82,7 @@ private static final Color NAVY  = new Color(0x1e, 0x40, 0xaf);
     }
 
     private void addParams(JasperDesign d) throws JRException {
-        for (String n : List.of("PORTFOLIO","FY","GAINS","LOSSES","DISCOUNT","NET_CGT","CARRIED")) {
+        for (String n : List.of("PORTFOLIO","FY","SHORT_TERM","LONG_TERM","GAINS","LOSSES","PRIOR_losses","DISCOUNT","NET_CGT","CARRIED")) {
             JRDesignParameter p = new JRDesignParameter();
             p.setName(n); p.setValueClass(String.class);
             d.addParameter(p);
@@ -189,23 +189,24 @@ private static final Color NAVY  = new Color(0x1e, 0x40, 0xaf);
     // ── Summary band ──────────────────────────────────────────────────────────
 
     private void addSummary(JasperDesign d) {
-        JRDesignBand b = band(100);
+        JRDesignBand b = band(110);
 
         // Divider
         b.addElement(line(0, 0, PAGE_W));
 
         int y = 15;
-        b.addElement(summaryPair("Total gross capital gains",       "$P{GAINS}",    y, true)); y += 14;
+        b.addElement(summaryPair("Total gross capital gains",        "$P{GAINS}",    y, true)); y += 14;
         b.addElement(summaryPair("Less: current year capital losses","($P{LOSSES})", y, true)); y += 14;
-        b.addElement(summaryPair("Less: 50% CGT discount",          "($P{DISCOUNT})",y, true)); y += 14;
+        b.addElement(summaryPair("Less: prior year losses applied", "($P{PRIOR_losses})", y, true)); y += 14;
+        b.addElement(summaryPair("Less: 50% CGT discount",       "($P{DISCOUNT})",y, true)); y += 14;
         b.addElement(line(300, y, 420)); y += 6;
-        b.addElement(summaryPair("Net assessable capital gain",     "$P{NET_CGT}",  y, true));  y += 14;
-        b.addElement(summaryPair("Losses carried forward",       "$P{CARRIED}",  y, false));
+        b.addElement(summaryPair("Net assessable capital gain",      "$P{NET_CGT}",  y, true));  y += 14;
+        b.addElement(summaryPair("Losses carried forward",      "$P{CARRIED}",  y, false));
 
         // Footnote
         b.addElement(staticText(
             "TradeTracker - Australian financial year 1 July - 30 June",
-            10, 85, PAGE_W, 10, 8, false, Color.GRAY, null));
+            10, 95, PAGE_W, 10, 8, false, Color.GRAY, null));
 
         d.setSummary(b);
     }
@@ -290,19 +291,24 @@ private static final Color NAVY  = new Color(0x1e, 0x40, 0xaf);
 
     private Map<String, Object> buildParams(String name, int fy,
                                              AustralianCgtService.TaxYearCgtSummary s) {
-        BigDecimal discount = s.totalGrossGains()
-            .subtract(s.totalCurrentYearLosses())
-            .subtract(s.netAssessableCgt())
+        BigDecimal totalGains = (s.shortTermGains() != null ? s.shortTermGains() : BigDecimal.ZERO)
+            .add(s.longTermGains() != null ? s.longTermGains() : BigDecimal.ZERO);
+        BigDecimal discount = totalGains
+            .subtract(s.totalCurrentYearLosses() != null ? s.totalCurrentYearLosses() : BigDecimal.ZERO)
+            .subtract(s.netAssessableCgt() != null ? s.netAssessableCgt() : BigDecimal.ZERO)
             .max(BigDecimal.ZERO);
 
         Map<String, Object> params = new HashMap<>();
         params.put("PORTFOLIO", name);
         params.put("FY", (fy - 1) + "-" + String.valueOf(fy).substring(2));
-        params.put("GAINS", aud(s.totalGrossGains()));
-        params.put("LOSSES", aud(s.totalCurrentYearLosses()));
+        params.put("SHORT_TERM", aud(s.shortTermGains() != null ? s.shortTermGains() : BigDecimal.ZERO));
+        params.put("LONG_TERM", aud(s.longTermGains() != null ? s.longTermGains() : BigDecimal.ZERO));
+        params.put("GAINS", aud(totalGains));
+        params.put("LOSSES", aud(s.totalCurrentYearLosses() != null ? s.totalCurrentYearLosses() : BigDecimal.ZERO));
+        params.put("PRIOR_losses", aud(s.priorYearLossesApplied() != null ? s.priorYearLossesApplied() : BigDecimal.ZERO));
         params.put("DISCOUNT", aud(discount));
-        params.put("NET_CGT", aud(s.netAssessableCgt()));
-        params.put("CARRIED", aud(s.lossesCarriedForward()));
+        params.put("NET_CGT", aud(s.netAssessableCgt() != null ? s.netAssessableCgt() : BigDecimal.ZERO));
+        params.put("CARRIED", aud(s.lossesCarriedForward() != null ? s.lossesCarriedForward() : BigDecimal.ZERO));
         return params;
     }
 

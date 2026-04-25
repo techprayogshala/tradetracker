@@ -117,10 +117,10 @@ export default function TradesPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['trades', portfolioId, search, typeFilter, page],
     queryFn: async () => {
-      const res = await api.get<TradesPage>(`/v1/portfolios/${portfolioId}/trades`, {
-        params: { ticker: search || undefined, tradeType: typeFilter || undefined,
-                  page, size: 25, sort: 'tradeDate,desc' },
-      })
+      const params: Record<string, string> = { page: String(page), size: '25', sort: 'tradeDate,desc' }
+      if (search) params.ticker = search
+      if (typeFilter) params.tradeType = typeFilter
+      const res = await api.get<TradesPage>(`/v1/portfolios/${portfolioId}/trades`, { params })
       return res.data
     },
     enabled: !!portfolioId,

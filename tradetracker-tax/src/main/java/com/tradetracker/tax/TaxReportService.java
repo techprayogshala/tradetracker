@@ -8,6 +8,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -36,21 +38,42 @@ public class TaxReportService {
 
     // ── CGT Summary ───────────────────────────────────────────────────────────
 
+    @PersistenceContext
+    private EntityManager em;
+
     public AustralianCgtService.TaxYearCgtSummary getCgtSummary(
             String keycloakSub, UUID portfolioId, int financialYear) {
         requireOwnership(keycloakSub, portfolioId);
         List<AustralianCgtService.CgtResult> results =
             fetchDisposals(portfolioId, financialYear).stream().map(this::toResult).toList();
-        var summary = cgtService.summariseTaxYear(results, BigDecimal.ZERO);
+        
+        BigDecimal carriedForwardLoss = getCarriedForwardLoss(portfolioId, financialYear);
+        var summary = cgtService.summariseTaxYear(results, carriedForwardLoss);
+        
         return new AustralianCgtService.TaxYearCgtSummary(
             financialYear,
-            summary.totalGrossGains(),
+            summary.shortTermGains(),
+            summary.longTermGains(),
             summary.totalDiscountableGains(),
             summary.totalCurrentYearLosses(),
             summary.priorYearLossesApplied(),
             summary.netAssessableCgt(),
             summary.lossesCarriedForward()
         );
+    }
+
+    private BigDecimal getCarriedForwardLoss(UUID portfolioId, int financialYear) {
+        try {
+            var result = em.createNativeQuery(
+                "SELECT losses_carried_forward FROM cgt_year_summaries " +
+                "WHERE portfolio_id = :pid AND financial_year = :fy")
+                .setParameter("pid", portfolioId)
+                .setParameter("fy", financialYear - 1)
+                .getSingleResult();
+            return result != null ? (BigDecimal) result : BigDecimal.ZERO;
+        } catch (Exception e) {
+            return BigDecimal.ZERO;
+        }
     }
 
     // ── CGT Events ────────────────────────────────────────────────────────────
