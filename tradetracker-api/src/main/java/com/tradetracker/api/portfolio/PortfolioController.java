@@ -61,7 +61,8 @@ public class PortfolioController {
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CreatePortfolioRequest req) {
         var p = svc.createPortfolio(
-            jwt.getSubject(), req.name(), req.baseCurrency(),
+            jwt.getSubject(), req.name(), 
+            req.baseCurrency() != null ? req.baseCurrency() : "AUD",
             req.parcelMatchingStrategy(), Boolean.TRUE.equals(req.makeDefault()));
         // Re-query to get the enriched summary (total value, gains etc.)
         return svc.listPortfolios(jwt.getSubject()).stream()

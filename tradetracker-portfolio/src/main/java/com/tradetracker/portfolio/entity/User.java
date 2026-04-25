@@ -45,6 +45,7 @@ public class User extends BaseEntity {
 
     // ── Setters ──────────────────────────────────────────────────────────────
 
+    public void setKeycloakSub(String keycloakSub) { this.keycloakSub = keycloakSub; }
     public void setEmail(String email)             { this.email = email; }
     public void setDisplayName(String displayName) { this.displayName = displayName; }
     public void setBaseCurrency(String currency)   { this.baseCurrency = currency; }

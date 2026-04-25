@@ -12,6 +12,10 @@ const apiClient = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+apiClient.defaults.paramsSerializer = (params) => {
+  return new URLSearchParams(params).toString()
+}
+
 apiClient.interceptors.request.use(async (config) => {
   const kc = window._keycloak
   if (!kc?.token) {

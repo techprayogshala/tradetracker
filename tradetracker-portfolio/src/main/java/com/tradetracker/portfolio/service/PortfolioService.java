@@ -84,20 +84,35 @@ public class PortfolioService {
     /**
      * Called on first login. Creates the user record and a default portfolio.
      * Idempotent — safe to call on every login.
+     * Checks both keycloakSub and email to avoid duplicates.
      */
     public User provisionUser(String keycloakSub, String email, String displayName) {
-        return userRepo.findByKeycloakSub(keycloakSub).orElseGet(() -> {
-            User user = new User(keycloakSub, email, displayName);
-            userRepo.save(user);
+        // First try by keycloakSub
+        var existing = userRepo.findByKeycloakSub(keycloakSub);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+        
+        // Try by email as fallback (for migrated users with different keycloakSub)
+        var byEmail = userRepo.findByEmail(email);
+        if (byEmail.isPresent()) {
+            User user = byEmail.get();
+            user.setKeycloakSub(keycloakSub);
+            user.setDisplayName(displayName);
+            return userRepo.save(user);
+        }
+        
+        // Create new user
+        User user = new User(keycloakSub, email, displayName);
+        userRepo.save(user);
 
-            Portfolio defaultPortfolio = Portfolio.createDefault(user);
-            portfolioRepo.save(defaultPortfolio);
+        Portfolio defaultPortfolio = Portfolio.createDefault(user);
+        portfolioRepo.save(defaultPortfolio);
 
-            Account defaultAccount = new Account(defaultPortfolio, "Default Account", user.getBaseCurrency());
-            accountRepo.save(defaultAccount);
+        Account defaultAccount = new Account(defaultPortfolio, "Default Account", user.getBaseCurrency());
+        accountRepo.save(defaultAccount);
 
-            return user;
-        });
+        return user;
     }
 
     // ── Portfolios ───────────────────────────────────────────────────────────
@@ -301,6 +316,7 @@ public class PortfolioService {
         return trade;
     }
 
+    @Transactional
     @CacheEvict(value = "portfolios", allEntries = true)
     public void deleteTrade(String keycloakSub, UUID portfolioId, UUID tradeId) {
         requirePortfolio(keycloakSub, portfolioId);
@@ -308,19 +324,26 @@ public class PortfolioService {
         TradeEvent trade = tradeRepo.findByIdWithDetails(tradeId, portfolioId)
             .orElseThrow(() -> new IllegalArgumentException("Trade not found"));
         
-        // Delete associated parcels and disposals
         parcelRepo.deleteByTradeId(tradeId);
-        
         tradeRepo.delete(trade);
+        tradeRepo.flush();
     }
 
+    @Transactional
     public TradeEvent updateTrade(String keycloakSub, UUID portfolioId, UUID tradeId, TradeCommand cmd) {
         requirePortfolio(keycloakSub, portfolioId);
         
         TradeEvent trade = tradeRepo.findByIdWithDetails(tradeId, portfolioId)
             .orElseThrow(() -> new IllegalArgumentException("Trade not found"));
         
-        trade.setTradeType(TradeEvent.TradeType.valueOf(cmd.tradeType()));
+        Portfolio portfolio = trade.getPortfolio();
+        Security security = trade.getSecurity();
+        TradeEvent.TradeType oldType = trade.getTradeType();
+        TradeEvent.TradeType newType = TradeEvent.TradeType.valueOf(cmd.tradeType());
+        
+        parcelRepo.deleteByTradeId(tradeId);
+        
+        trade.setTradeType(newType);
         trade.setQuantity(cmd.quantity());
         trade.setPrice(cmd.price());
         trade.setFees(cmd.fees());
@@ -331,7 +354,17 @@ public class PortfolioService {
         trade.setNotes(cmd.notes());
         trade.setExternalRef(cmd.externalRef());
         
-        return tradeRepo.save(trade);
+        TradeEvent saved = tradeRepo.save(trade);
+        
+        if (newType == TradeEvent.TradeType.BUY) {
+            createParcel(portfolio, security, saved);
+        } else if (newType == TradeEvent.TradeType.SELL) {
+            matchAndReduceParcels(portfolio, security, saved);
+        } else if (newType == TradeEvent.TradeType.RETURN_OF_CAPITAL) {
+            reduceCostBase(portfolio, security, saved);
+        }
+        
+        return saved;
     }
 
     // ── Parcel operations ────────────────────────────────────────────────────
