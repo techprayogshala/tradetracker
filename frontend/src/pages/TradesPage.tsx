@@ -531,32 +531,32 @@ function BulkUploadModal({ portfolioId, onClose }: { portfolioId: string; onClos
     alert('CSV PARSE STARTED!')
     console.log('=== CSV PARSE STARTED ===')
     const rows: string[][] = []
-    let currentRow: string[] = []
-    let currentCell = ''
-    let inQuotes = false
+      let currentRow: string[] = []
+      let currentCell = ''
+      let inQuotes = false
 
-    for (let i = 0; i < text.length; i++) {
-      const char = text[i]
-      const nextChar = text[i + 1]
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i]
+        const nextChar = text[i + 1]
 
-      if (inQuotes) {
-        if (char === '"' && nextChar === '"') {
-          currentCell += '"'
-          i++
-        } else if (char === '"') {
-          inQuotes = false
+        if (inQuotes) {
+          if (char === '"' && nextChar === '"') {
+            currentCell += '"'
+            i++
+          } else if (char === '"') {
+            inQuotes = false
+          } else {
+            currentCell += char
+          }
         } else {
-          currentCell += char
-        }
-      } else {
-        if (char === '"') {
-          inQuotes = true
-        } else if (char === ',') {
-          currentRow.push(currentCell.trim())
-          currentCell = ''
-        } else if (char === '\n' || (char === '\r' && nextChar === '\n')) {
-          currentRow.push(currentCell.trim())
-          if (currentRow.some(c => c)) rows.push(currentRow)
+          if (char === '"') {
+            inQuotes = true
+          } else if (char === ',') {
+            currentRow.push(currentCell.trim())
+            currentCell = ''
+          } else if (char === '\n' || (char === '\r' && nextChar === '\n')) {
+            currentRow.push(currentCell.trim())
+            if (currentRow.some(c => c)) rows.push(currentRow)
           currentRow = []
           currentCell = ''
           if (char === '\r') i++
@@ -597,8 +597,8 @@ function BulkUploadModal({ portfolioId, onClose }: { portfolioId: string; onClos
     }
 
     const tickerCol = findCol(['code', 'marketcode', 'ticker', 'symbol', 'instrument'])
-    const typeCol = findCol(['type', 'trdtype', 'action', 'side', 'buysell', 'tradetype'])
-    console.log('typeCol index:', typeCol)
+    const typeCol = findCol(['type', 'trdtype', 'action', 'side', 'buysell', 'tradetype', 'transactiontype', 'buyorsell'])
+    console.log('typeCol index:', typeCol, 'headers:', headers)
     const qtyCol = findCol(['qty', 'quantity', 'units', 'shares', 'volume', 'number'])
     const priceCol = findCol(['price', 'rate', 'priceaud', 'unitprice', 'amount'])
     const dateCol = findCol(['date', 'tradedate', 'transactiondate', 'trxdate'])
@@ -617,25 +617,30 @@ function BulkUploadModal({ portfolioId, onClose }: { portfolioId: string; onClos
       // Skip empty rows or rows with only whitespace
       if (!ticker || ticker === '') continue
 
-      // Parse quantity - skip if invalid
+      // Parse quantity - allow negative for sells
       const qtyRaw = qtyCol >= 0 ? values[qtyCol] : values[2] || '0'
       const quantity = parseFloat(qtyRaw.replace(/[^0-9.-]/g, ''))
-      if (isNaN(quantity) || quantity <= 0) continue
+      if (isNaN(quantity) || quantity === 0) continue
 
-      // Parse price - skip if invalid
+      // Parse price - allow negative for sells
       const priceRaw = priceCol >= 0 ? values[priceCol] : values[3] || '0'
       const price = parseFloat(priceRaw.replace(/[^0-9.-]/g, ''))
-      if (isNaN(price) || price <= 0) continue
+      if (isNaN(price) || price === 0) continue
 
       // Parse trade type
-      let tradeType = 'BUY' // Default to BUY
-      if (typeCol >= 0) {
-        const typeRaw = values[typeCol].toUpperCase().trim()
+      let tradeType = 'BUY'
+      
+      console.log('typeCol:', typeCol, 'value:', typeCol >= 0 ? values[typeCol] : 'N/A')
+      
+      // Check type column first
+      if (typeCol >= 0 && values[typeCol] && values[typeCol].toString().trim()) {
+        const typeRaw = values[typeCol].toString().toUpperCase().trim()
+        console.log('Row', i, 'typeRaw:', typeRaw)
         if (typeRaw.includes('SELL') || typeRaw.includes('SOLD') || typeRaw === 'S') {
           tradeType = 'SELL'
         } else if (typeRaw.includes('DIV') || typeRaw.includes('DRIP')) {
           tradeType = 'DIVIDEND'
-        } else if (typeRaw.includes('TRANSFER IN') || typeRaw === 'TI' || typeRaw.includes('IN')) {
+        } else if (typeRaw.includes('TRANSFER IN') || typeRaw === 'TI' || typeRaw.includes(' IN')) {
           tradeType = 'TRANSFER_IN'
         } else if (typeRaw.includes('TRANSFER OUT') || typeRaw === 'TO' || typeRaw.includes('OUT')) {
           tradeType = 'TRANSFER_OUT'
@@ -644,8 +649,18 @@ function BulkUploadModal({ portfolioId, onClose }: { portfolioId: string; onClos
         } else if (typeRaw === 'BUY' || typeRaw === 'B') {
           tradeType = 'BUY'
         }
-        console.log('Row', i, 'type:', typeRaw, '->', tradeType)
+        console.log('Row', i, 'tradeType:', tradeType)
+      } else if (quantity < 0) {
+        // Negative quantity = SELL
+        tradeType = 'SELL'
+      } else if (price < 0) {
+        // Negative price = SELL
+        tradeType = 'SELL'
       }
+      
+      // Use absolute values for quantity and price
+      const absQuantity = Math.abs(quantity)
+      const absPrice = Math.abs(price)
 
       // Parse date - try various formats
       let tradeDate = format(new Date(), 'yyyy-MM-dd')
@@ -669,9 +684,9 @@ function BulkUploadModal({ portfolioId, onClose }: { portfolioId: string; onClos
         ticker,
         exchange: 'ASX',
         tradeType,
-        quantity,
-        price,
-        fees: isNaN(fees) ? 0 : fees,
+        quantity: absQuantity,
+        price: absPrice,
+        fees: isNaN(fees) ? 0 : Math.abs(fees),
         currency: /^[A-Z]{3}$/.test(currency) ? currency : 'AUD',
         tradeDate,
         notes: nameCol >= 0 ? values[nameCol].trim() : '',

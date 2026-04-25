@@ -11,11 +11,13 @@ import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -237,14 +239,21 @@ public class PortfolioController {
 
     @PostMapping("/{portfolioId}/trades/bulk")
     @ResponseStatus(HttpStatus.CREATED)
+    @Transactional
     @Operation(summary = "Bulk import trades from array — each trade creates a parcel")
     public List<TradeDto> bulkCreateTrades(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID portfolioId,
             @Valid @RequestBody List<CreateTradeRequest> trades) {
 
+        // Sort trades: process by date (oldest first, nulls last), then type (BUYs before SELLs)
+        var sortedTrades = trades.stream()
+            .sorted(Comparator.comparing(CreateTradeRequest::tradeDate, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(req -> "BUY".equalsIgnoreCase(req.tradeType()) ? 0 : 1))
+            .toList();
+
         List<TradeDto> results = new ArrayList<>();
-        for (var req : trades) {
+        for (var req : sortedTrades) {
             var t = svc.recordTrade(jwt.getSubject(), portfolioId, new TradeCommand(
                 req.ticker(), req.exchange(), req.tradeType(),
                 req.quantity(), req.price(), req.fees(), req.currency(), req.fxRateToBase(),

@@ -255,6 +255,7 @@ public class PortfolioService {
         @CacheEvict(value = "portfolios", allEntries = true),
         @CacheEvict(value = "performance",allEntries = true)
     })
+    @Transactional
     public TradeEvent recordTrade(String keycloakSub, UUID portfolioId,
                                   TradeCommand cmd) {
         Portfolio portfolio = requirePortfolio(keycloakSub, portfolioId);
@@ -287,6 +288,7 @@ public class PortfolioService {
             .build();
 
         tradeRepo.save(trade);
+        tradeRepo.flush(); // Ensure trade is persisted before parcel matching
 
         switch (trade.getTradeType()) {
             case BUY -> createParcel(portfolio, security, trade);
@@ -351,6 +353,12 @@ public class PortfolioService {
     private void matchAndReduceParcels(Portfolio portfolio, Security security, TradeEvent sell) {
         List<TaxParcel> openParcels = parcelRepo.findOpenParcels(portfolio.getId(), security.getId());
 
+        if (openParcels.isEmpty()) {
+            throw new InsufficientHoldingsException(
+                "No parcels found for " + security.getTicker() + ". " +
+                "Please ensure you have BUY trades before importing SELL trades.");
+        }
+
         // Look up the portfolio's configured strategy (FIFO / LIFO / MINIMISE_CGT)
         com.tradetracker.portfolio.matching.ParcelMatchingStrategy strategy =
             matchingStrategies.getOrDefault(
@@ -372,7 +380,10 @@ public class PortfolioService {
         try {
             allocations = strategy.match(sellEvent, views);
         } catch (com.tradetracker.portfolio.matching.InsufficientHoldingsException e) {
-            throw new InsufficientHoldingsException(e.getMessage());
+            throw new InsufficientHoldingsException(
+                "Insufficient holdings for " + security.getTicker() + 
+                ". Sell quantity (" + sell.getQuantity() + ") exceeds available parcels (" +
+                openParcels.stream().mapToDouble(p -> p.getQuantityRemaining().doubleValue()).sum() + ")");
         }
 
         // Apply allocations back to entity state and write audit ledger
