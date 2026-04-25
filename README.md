@@ -1,6 +1,6 @@
 # TradeTracker
 
-> Open-source portfolio tracker replicating Sharesight — built on Java 21 + Spring Boot 3 + React.
+> Open-source portfolio tracker — built on Java 21 + Spring Boot 3 + React.
 
 ---
 
