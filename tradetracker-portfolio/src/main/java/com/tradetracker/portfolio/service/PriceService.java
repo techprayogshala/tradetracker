@@ -31,7 +31,6 @@ public class PriceService {
      *
      * Uses a TimescaleDB DISTINCT ON query which is very fast on hypertables.
      */
-    @Cacheable(value = "prices", key = "#securityIds.hashCode()")
     public Map<UUID, BigDecimal> getCurrentPrices(List<UUID> securityIds) {
         if (securityIds.isEmpty()) return Map.of();
 

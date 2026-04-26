@@ -43,14 +43,32 @@ public class TradeEventMarketDataListener {
         String ticker = resolveTickerForTrade(event.tradeId());
         if (ticker == null) return;
 
+        UUID securityId = resolveSecurityId(event.tradeId());
+        if (securityId == null) return;
+
+        // Add to watch list if not already there
+        addToWatchListIfNeeded(securityId);
+
         boolean hasHistory = hasPriceHistory(event.tradeId());
         if (!hasHistory) {
             log.info("New security detected via trade {} — triggering backfill for {}",
                 event.tradeId(), ticker);
-            UUID securityId = resolveSecurityId(event.tradeId());
-            if (securityId != null) {
-                priceSyncService.backfillHistory(securityId, ticker);
-            }
+            priceSyncService.backfillHistory(securityId, ticker);
+        }
+    }
+
+    private void addToWatchListIfNeeded(UUID securityId) {
+        Integer exists = jdbc.sql("SELECT 1 FROM price_watch_list WHERE security_id = :id")
+            .param("id", securityId)
+            .query(Integer.class)
+            .optional()
+            .orElse(null);
+
+        if (exists == null) {
+            jdbc.sql("INSERT INTO price_watch_list (security_id, added_at, sync_enabled) VALUES (:id, NOW(), true)")
+                .param("id", securityId)
+                .update();
+            log.info("Added security {} to price watch list", securityId);
         }
     }
 

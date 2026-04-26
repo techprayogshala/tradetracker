@@ -2,6 +2,56 @@
 
 ---
 
+## STAGE 6 CHECKPOINT (2026-04-26)
+
+**Status**: COMPLETE - Dividends tab, Source tracking, Price fixes
+
+**New Features**:
+
+1. **Dividends Tab** (TaxPage.tsx)
+   - New "Dividends" tab in Tax & CGT page
+   - Summary cards: Cash Dividends, Franking Credits, Grossed-Up Income, Tax Withheld
+   - Dividend history table by holding
+   - API: `GET /v1/portfolios/{id}/tax/dividends?financialYear=YYYY`
+
+2. **Trade Source Tracking**
+   - `TradeCommand` now accepts `source` parameter
+   - CSV bulk import sets `Source.CSV_IMPORT`
+   - Broker sync sets `Source.BROKER_API`
+   - Manual entry sets `Source.MANUAL`
+   - Added `setSource()` method to `TradeEvent` entity
+
+3. **Friendly Source Labels**
+   - Frontend now displays: "Manual", "CSV Import", "Broker API", "PDF Import"
+   - Previously used raw enum values
+
+4. **Auto-add Securities to Price Watch**
+   - `TradeEventMarketDataListener` now adds new securities to `price_watch_list`
+   - Triggers historical backfill for securities without price data
+
+**Fixes Applied**:
+
+1. **Price Cache Bug** (`PriceService.java`)
+   - Removed `@Cacheable` annotation that was causing stale $0.00 prices
+   - Cache key using `hashCode()` was inconsistent across JVM restarts
+   - Now fetches fresh prices from database each request
+
+2. **CSV Import Source** (`PortfolioController.java`)
+   - Bulk create now passes `TradeEvent.Source.CSV_IMPORT` to TradeCommand
+
+3. **Broker Sync Source** (`BrokerSyncService.java`)
+   - Broker imports now set `TradeEvent.Source.BROKER_API`
+
+4. **Source Display** (`TradesPage.tsx`)
+   - Added `fmtSource()` helper for user-friendly labels
+   - Removed debug `alert('CSV PARSE STARTED!')`
+
+**Database Updates**:
+- Added CBA, TWE to `price_watch_list` table
+- Inserted mock prices for CBA ($282.50) and TWE ($15.20)
+
+---
+
 ## STAGE 5 CHECKPOINT (2026-04-26)
 
 **Status**: COMPLETE - Column sorting on all tables, alignment fixes
