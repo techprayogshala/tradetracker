@@ -316,6 +316,7 @@ public class PortfolioService {
             .settlementDate(cmd.settlementDate())
             .notes(cmd.notes())
             .externalRef(cmd.externalRef())
+            .source(cmd.source() != null ? cmd.source() : TradeEvent.Source.MANUAL)
             .build();
 
         tradeRepo.save(trade);
@@ -369,6 +370,9 @@ public class PortfolioService {
         trade.setSettlementDate(cmd.settlementDate());
         trade.setNotes(cmd.notes());
         trade.setExternalRef(cmd.externalRef());
+        if (cmd.source() != null) {
+            trade.setSource(cmd.source());
+        }
         
         TradeEvent saved = tradeRepo.save(trade);
         
@@ -550,7 +554,8 @@ public class PortfolioService {
         BigDecimal quantity, BigDecimal price, BigDecimal fees,
         String currency, BigDecimal fxRateToBase,
         LocalDate tradeDate, LocalDate settlementDate,
-        UUID accountId, String externalRef, String notes
+        UUID accountId, String externalRef, String notes,
+        TradeEvent.Source source
     ) {}
 
     public record PortfolioSummary(

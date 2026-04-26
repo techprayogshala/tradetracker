@@ -2,6 +2,7 @@ package com.tradetracker.broker.service;
 
 import com.tradetracker.broker.adapter.BrokerAdapter;
 import com.tradetracker.broker.adapter.BrokerAdapter.BrokerTrade;
+import com.tradetracker.portfolio.entity.TradeEvent;
 import com.tradetracker.portfolio.service.PortfolioService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -114,7 +115,8 @@ public class BrokerSyncService {
                         trade.quantity(), trade.price(), trade.fees(),
                         trade.currency(), null,
                         trade.tradeDate(), trade.settlementDate(),
-                        null, trade.externalRef(), "Imported from " + conn.broker()
+                        null, trade.externalRef(), "Imported from " + conn.broker(),
+                        TradeEvent.Source.BROKER_API
                     ));
 
                 // Log the raw import

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
-import { Download, TrendingUp, TrendingDown, Shield, AlertCircle, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Download, TrendingUp, TrendingDown, Shield, AlertCircle, Loader2, ChevronDown, ChevronUp, DollarSign } from 'lucide-react'
 import clsx from 'clsx'
 import api from '../lib/apiClient'
 
@@ -59,7 +59,7 @@ const FY_OPTIONS = Array.from({ length: 5 }, (_, i) => currentFY() - i)
 export default function TaxPage() {
   const { portfolioId } = useParams<{ portfolioId: string }>()
   const [fy, setFy]     = useState(currentFY())
-  const [tab, setTab]   = useState<'summary' | 'events' | 'parcels'>('summary')
+  const [tab, setTab]   = useState<'summary' | 'events' | 'parcels' | 'dividends'>('summary')
   const [eventSort, setEventSort] = useState('disposalDate')
   const [eventSortDir, setEventSortDir] = useState<'asc' | 'desc'>('desc')
   const [parcelSort, setParcelSort] = useState('acquisitionDate')
@@ -108,6 +108,15 @@ export default function TaxPage() {
       return r.data
     },
     enabled: !!portfolioId && tab === 'parcels',
+  })
+
+  const dividendsQ = useQuery({
+    queryKey: ['dividends', portfolioId, fy],
+    queryFn: async () => {
+      const r = await api.get<{ financialYear: number; totalCashDividends: number; totalFrankingCredits: number; totalGrossedUpIncome: number; totalTaxWithheld: number; byHolding: { ticker: string; cashDividends: number; frankingCredits: number; grossedUpAmount: number; frankingPercentage: number }[] }>(`/v1/portfolios/${portfolioId}/tax/dividends`, { params: { financialYear: fy } })
+      return r.data
+    },
+    enabled: !!portfolioId && tab === 'dividends',
   })
 
   const handleCsvDownload = async () => {
@@ -192,10 +201,10 @@ export default function TaxPage() {
         </span>
       </div>
 
-      {/* ── Tabs ──────────────────────────────────────────────────────── */}
+      {/* ── Tabs ──────────────────────────────────────────────────────────────── */}
       <div className="border-b border-gray-200">
         <nav className="flex gap-6 -mb-px">
-          {(['summary', 'events', 'parcels'] as const).map(t => (
+          {(['summary', 'events', 'parcels', 'dividends'] as const).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -208,7 +217,8 @@ export default function TaxPage() {
             >
               {t === 'summary' ? 'CGT Breakdown'
                : t === 'events' ? `Disposal Events FY${fy}`
-               : 'Open Parcels'}
+               : t === 'parcels' ? 'Open Parcels'
+               : 'Dividends'}
             </button>
           ))}
         </nav>
@@ -235,6 +245,19 @@ export default function TaxPage() {
           sortDir={parcelSortDir}
           onSort={toggleParcelSort}
         />
+      )}
+      {tab === 'dividends' && (
+        dividendsQ.isLoading ? (
+          <div className="flex items-center gap-2 text-gray-400 py-4">
+            <Loader2 size={16} className="animate-spin" /> Loading dividends…
+          </div>
+        ) : dividendsQ.data ? (
+          <DividendsView data={dividendsQ.data} />
+        ) : (
+          <div className="bg-white rounded-xl border border-gray-200 px-6 py-10 text-center text-gray-400">
+            No dividend data for FY {fy - 1}–{fy}
+          </div>
+        )
       )}
     </div>
   )
@@ -532,6 +555,88 @@ function TaxCard({ label, value, icon, positive, neutral, highlight, sub }:
         {value}
       </div>
       {sub && <div className="text-xs text-gray-400 mt-1">{sub}</div>}
+    </div>
+  )
+}
+
+function DividendsView({ data }: { data: {
+  financialYear: number
+  totalCashDividends: number
+  totalFrankingCredits: number
+  totalGrossedUpIncome: number
+  totalTaxWithheld: number
+  byHolding: { ticker: string; cashDividends: number; frankingCredits: number; grossedUpAmount: number; frankingPercentage: number }[]
+} }) {
+  return (
+    <div className="space-y-6">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <TaxCard
+          label="Cash Dividends"
+          value={fmtCcy(data.totalCashDividends)}
+          icon={<TrendingUp size={15} />}
+          positive
+        />
+        <TaxCard
+          label="Franking Credits"
+          value={fmtCcy(data.totalFrankingCredits)}
+          icon={<Shield size={15} />}
+          positive
+          sub="30% tax offset"
+        />
+        <TaxCard
+          label="Grossed-Up Income"
+          value={fmtCcy(data.totalGrossedUpIncome)}
+          icon={<DollarSign size={15} />}
+          neutral
+          sub="Taxable income"
+        />
+        <TaxCard
+          label="Tax Withheld"
+          value={fmtCcy(data.totalTaxWithheld)}
+          icon={<TrendingDown size={15} />}
+        />
+      </div>
+
+      {/* Dividends Table */}
+      <div className="bg-white rounded-xl border border-gray-200">
+        <div className="px-6 py-3 border-b border-gray-100 flex items-center justify-between">
+          <span className="text-sm font-semibold text-gray-700">Dividend History</span>
+          <span className="text-xs text-gray-400">{data.byHolding.length} holdings</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-400 border-b border-gray-100">
+                {['Ticker', 'Cash Dividend', 'Franking Credits', 'Franking %', 'Grossed-Up', 'Tax Withheld'].map(h => (
+                  <th key={h} className="px-4 py-3 text-left font-medium whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {data.byHolding.map((d, i) => (
+                <tr key={i} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/40">
+                  <td className="px-4 py-3 text-left font-semibold text-gray-900">{d.ticker}</td>
+                  <td className="px-4 py-3 text-left tabular-nums text-gray-700">{fmtCcy(d.cashDividends)}</td>
+                  <td className="px-4 py-3 text-left tabular-nums text-emerald-600">{fmtCcy(d.frankingCredits)}</td>
+                  <td className="px-4 py-3 text-left tabular-nums text-gray-500">
+                    {d.frankingPercentage > 0 ? `${(d.frankingPercentage * 100).toFixed(0)}%` : '—'}
+                  </td>
+                  <td className="px-4 py-3 text-left tabular-nums text-gray-700">{fmtCcy(d.grossedUpAmount)}</td>
+                  <td className="px-4 py-3 text-left tabular-nums text-gray-500">{fmtCcy(0)}</td>
+                </tr>
+              ))}
+              {data.byHolding.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-gray-400">
+                    No dividends recorded for this financial year.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   )
 }

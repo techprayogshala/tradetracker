@@ -292,3 +292,36 @@ export interface CgtEvent {
   holdingDays: number
 }
 
+// ── Dividends ────────────────────────────────────────────────────────
+
+export interface DividendDetail {
+  ticker: string
+  cashDividends: number
+  frankingCredits: number
+  grossedUpAmount: number
+  frankingPercentage: number
+}
+
+export interface DividendSummary {
+  financialYear: number
+  totalCashDividends: number
+  totalFrankingCredits: number
+  totalGrossedUpIncome: number
+  totalTaxWithheld: number
+  byHolding: DividendDetail[]
+}
+
+export function useDividends(portfolioId: string | undefined, financialYear: number) {
+  return useQuery({
+    queryKey: ['dividends', portfolioId, financialYear],
+    queryFn: async () => {
+      const res = await api.get<DividendSummary>(
+        `/v1/portfolios/${portfolioId}/tax/dividends`,
+        { params: { financialYear } }
+      )
+      return res.data
+    },
+    enabled: !!portfolioId,
+  })
+}
+

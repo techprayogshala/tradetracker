@@ -366,7 +366,7 @@ function TradeRow({ trade, isSelected, onSelect, onEdit, onDelete }: {
       <td className="px-5 py-3 text-left tabular-nums text-gray-500">{fmtCcy(trade.fees, trade.currency)}</td>
       <td className="px-5 py-3 text-left tabular-nums font-medium text-gray-900">{fmtCcy(trade.totalCost, trade.currency)}</td>
       <td className="px-5 py-3 text-left">
-        <span className="text-xs text-gray-400 capitalize">{trade.source.toLowerCase().replace('_', ' ')}</span>
+        <span className="text-xs text-gray-400">{fmtSource(trade.source)}</span>
       </td>
       <td className="px-5 py-3 w-16">
         <div className="flex items-center justify-end gap-1">
@@ -566,8 +566,6 @@ function BulkUploadModal({ portfolioId, onClose }: { portfolioId: string; onClos
   })
 
   const parseCsv = (text: string) => {
-    alert('CSV PARSE STARTED!')
-    console.log('=== CSV PARSE STARTED ===')
     const rows: string[][] = []
       let currentRow: string[] = []
       let currentCell = ''
@@ -945,6 +943,10 @@ function inputCls(hasError = false) {
 function fmtType(t: string) {
   return ({ BUY:'Buy', SELL:'Sell', DIVIDEND:'Dividend', RETURN_OF_CAPITAL:'Return of Capital',
             TRANSFER_IN:'Transfer In', TRANSFER_OUT:'Transfer Out' } as Record<string,string>)[t] ?? t
+}
+
+function fmtSource(t: string) {
+  return ({ MANUAL:'Manual', BROKER_API:'Broker API', PDF_IMPORT:'PDF Import', CSV_IMPORT:'CSV Import' } as Record<string,string>)[t] ?? t
 }
 
 function fmtCcy(value: number, currency = 'AUD') {

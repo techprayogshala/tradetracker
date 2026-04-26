@@ -125,3 +125,13 @@ export function useOpenParcels(portfolioId, sort = 'acquisitionDate') {
         enabled: !!portfolioId,
     });
 }
+export function useDividends(portfolioId, financialYear) {
+    return useQuery({
+        queryKey: ['dividends', portfolioId, financialYear],
+        queryFn: async () => {
+            const res = await api.get(`/v1/portfolios/${portfolioId}/tax/dividends`, { params: { financialYear } });
+            return res.data;
+        },
+        enabled: !!portfolioId,
+    });
+}

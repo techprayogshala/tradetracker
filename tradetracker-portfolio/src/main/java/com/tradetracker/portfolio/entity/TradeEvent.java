@@ -122,6 +122,7 @@ public class TradeEvent extends BaseEntity {
     public void setCurrency(String ccy) { this.currency = ccy; }
     public void setTradeDate(LocalDate date) { this.tradeDate = date; }
     public void setSettlementDate(LocalDate date) { this.settlementDate = date; }
+    public void setSource(Source source) { this.source = source; }
     public void setExternalRef(String ref) { this.externalRef = ref; }
     public void setAccount(Account account) { this.account = account; }
     public void setPortfolio(Portfolio portfolio) { this.portfolio = portfolio; }

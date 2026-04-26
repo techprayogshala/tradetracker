@@ -1,5 +1,6 @@
 package com.tradetracker.api.portfolio;
 
+import com.tradetracker.portfolio.entity.TradeEvent;
 import com.tradetracker.portfolio.service.PortfolioService;
 import com.tradetracker.portfolio.service.PortfolioService.*;
 import io.swagger.v3.oas.annotations.Operation;
@@ -156,7 +157,8 @@ public class PortfolioController {
         var t = svc.recordTrade(jwt.getSubject(), portfolioId, new TradeCommand(
             req.ticker(), req.exchange(), req.tradeType(),
             req.quantity(), req.price(), req.fees(), req.currency(), req.fxRateToBase(),
-            req.tradeDate(), req.settlementDate(), req.accountId(), req.externalRef(), req.notes()
+            req.tradeDate(), req.settlementDate(), req.accountId(), req.externalRef(), req.notes(),
+            TradeEvent.Source.MANUAL
         ));
         return new TradeDto(
             t.getId(),
@@ -200,7 +202,8 @@ public class PortfolioController {
         var t = svc.updateTrade(jwt.getSubject(), portfolioId, tradeId, new TradeCommand(
             req.ticker(), req.exchange(), req.tradeType(),
             req.quantity(), req.price(), req.fees(), req.currency(), req.fxRateToBase(),
-            req.tradeDate(), req.settlementDate(), req.accountId(), req.externalRef(), req.notes()
+            req.tradeDate(), req.settlementDate(), req.accountId(), req.externalRef(), req.notes(),
+            null
         ));
         return new TradeDto(
             t.getId(),
@@ -263,7 +266,8 @@ public class PortfolioController {
             var t = svc.recordTrade(jwt.getSubject(), portfolioId, new TradeCommand(
                 req.ticker(), req.exchange(), req.tradeType(),
                 req.quantity(), req.price(), req.fees(), req.currency(), req.fxRateToBase(),
-                req.tradeDate(), req.settlementDate(), req.accountId(), req.externalRef(), req.notes()
+                req.tradeDate(), req.settlementDate(), req.accountId(), req.externalRef(), req.notes(),
+                TradeEvent.Source.CSV_IMPORT
             ));
             results.add(new TradeDto(
                 t.getId(),
