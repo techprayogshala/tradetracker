@@ -6,11 +6,19 @@ import com.tradetracker.tax.TaxReportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+import static org.springframework.format.annotation.DateTimeFormat.ISO;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -62,17 +70,21 @@ public class TaxController {
     public List<TaxReportService.CgtEventView> getCgtEvents(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID portfolioId,
-            @RequestParam(defaultValue = "0") int financialYear) {
+            @RequestParam(defaultValue = "0") int financialYear,
+            @RequestParam(defaultValue = "disposalDate") String sort,
+            @RequestParam(defaultValue = "desc") String sortDir) {
         int fy = financialYear > 0 ? financialYear : LocalDate.now().getYear();
-        return taxSvc.getCgtEvents(jwt.getSubject(), portfolioId, fy);
+        return taxSvc.getCgtEvents(jwt.getSubject(), portfolioId, fy, sort, sortDir);
     }
 
     @GetMapping("/open-parcels")
     @Operation(summary = "All open tax parcels with unrealised CGT position")
     public List<TaxReportService.OpenParcelView> getOpenParcels(
             @AuthenticationPrincipal Jwt jwt,
-            @PathVariable UUID portfolioId) {
-        return taxSvc.getOpenParcels(jwt.getSubject(), portfolioId);
+            @PathVariable UUID portfolioId,
+            @RequestParam(defaultValue = "acquisitionDate") String sort,
+            @RequestParam(defaultValue = "desc") String sortDir) {
+        return taxSvc.getOpenParcels(jwt.getSubject(), portfolioId, sort, sortDir);
     }
 
     @GetMapping("/dividends")
@@ -93,7 +105,7 @@ public class TaxController {
             @RequestParam(defaultValue = "0") int financialYear) {
 
         int fy = financialYear > 0 ? financialYear : LocalDate.now().getYear();
-        var events  = taxSvc.getCgtEvents(jwt.getSubject(), portfolioId, fy);
+        var events  = taxSvc.getCgtEvents(jwt.getSubject(), portfolioId, fy, "disposalDate", "desc");
         var summary = taxSvc.getCgtSummary(jwt.getSubject(), portfolioId, fy);
 
         // Fetch portfolio name for the report header
@@ -114,7 +126,7 @@ public class TaxController {
             @PathVariable UUID portfolioId,
             @RequestParam(defaultValue = "0") int financialYear) {
         int fy = financialYear > 0 ? financialYear : LocalDate.now().getYear();
-        List<TaxReportService.CgtEventView> events = taxSvc.getCgtEvents(jwt.getSubject(), portfolioId, fy);
+        List<TaxReportService.CgtEventView> events = taxSvc.getCgtEvents(jwt.getSubject(), portfolioId, fy, "disposalDate", "desc");
         byte[] csv = buildCsv(events);
         return ResponseEntity.ok()
             .header(HttpHeaders.CONTENT_DISPOSITION,

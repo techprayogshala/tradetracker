@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
-import { Download, TrendingUp, TrendingDown, Shield, AlertCircle, Loader2, ChevronDown } from 'lucide-react'
+import { Download, TrendingUp, TrendingDown, Shield, AlertCircle, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
 import clsx from 'clsx'
 import api from '../lib/apiClient'
 
@@ -60,6 +60,28 @@ export default function TaxPage() {
   const { portfolioId } = useParams<{ portfolioId: string }>()
   const [fy, setFy]     = useState(currentFY())
   const [tab, setTab]   = useState<'summary' | 'events' | 'parcels'>('summary')
+  const [eventSort, setEventSort] = useState('disposalDate')
+  const [eventSortDir, setEventSortDir] = useState<'asc' | 'desc'>('desc')
+  const [parcelSort, setParcelSort] = useState('acquisitionDate')
+  const [parcelSortDir, setParcelSortDir] = useState<'asc' | 'desc'>('desc')
+
+  const toggleEventSort = (field: string) => {
+    if (eventSort === field) {
+      setEventSortDir(eventSortDir === 'asc' ? 'desc' : 'asc')
+    } else {
+      setEventSort(field)
+      setEventSortDir('desc')
+    }
+  }
+
+  const toggleParcelSort = (field: string) => {
+    if (parcelSort === field) {
+      setParcelSortDir(parcelSortDir === 'asc' ? 'desc' : 'asc')
+    } else {
+      setParcelSort(field)
+      setParcelSortDir('desc')
+    }
+  }
 
   const summaryQ = useQuery({
     queryKey: ['cgt-summary', portfolioId, fy],
@@ -71,18 +93,18 @@ export default function TaxPage() {
   })
 
   const eventsQ = useQuery({
-    queryKey: ['cgt-events', portfolioId, fy],
+    queryKey: ['cgt-events', portfolioId, fy, eventSort, eventSortDir],
     queryFn: async () => {
-      const r = await api.get<CgtEvent[]>(`/v1/portfolios/${portfolioId}/tax/cgt-events`, { params: { financialYear: fy } })
+      const r = await api.get<CgtEvent[]>(`/v1/portfolios/${portfolioId}/tax/cgt-events`, { params: { financialYear: fy, sort: eventSort, sortDir: eventSortDir } })
       return r.data
     },
     enabled: !!portfolioId && tab === 'events',
   })
 
   const parcelsQ = useQuery({
-    queryKey: ['open-parcels', portfolioId],
+    queryKey: ['open-parcels', portfolioId, parcelSort, parcelSortDir],
     queryFn: async () => {
-      const r = await api.get<OpenParcel[]>(`/v1/portfolios/${portfolioId}/tax/open-parcels`)
+      const r = await api.get<OpenParcel[]>(`/v1/portfolios/${portfolioId}/tax/open-parcels`, { params: { sort: parcelSort, sortDir: parcelSortDir } })
       return r.data
     },
     enabled: !!portfolioId && tab === 'parcels',
@@ -197,10 +219,22 @@ export default function TaxPage() {
         <CgtBreakdownTable summary={summaryQ.data} />
       )}
       {tab === 'events' && (
-        <CgtEventsTable events={eventsQ.data ?? []} isLoading={eventsQ.isLoading} />
+        <CgtEventsTable 
+          events={eventsQ.data ?? []} 
+          isLoading={eventsQ.isLoading}
+          sort={eventSort}
+          sortDir={eventSortDir}
+          onSort={toggleEventSort}
+        />
       )}
       {tab === 'parcels' && (
-        <OpenParcelsTable parcels={parcelsQ.data ?? []} isLoading={parcelsQ.isLoading} />
+        <OpenParcelsTable 
+          parcels={parcelsQ.data ?? []} 
+          isLoading={parcelsQ.isLoading}
+          sort={parcelSort}
+          sortDir={parcelSortDir}
+          onSort={toggleParcelSort}
+        />
       )}
     </div>
   )
@@ -303,8 +337,27 @@ function CgtBreakdownTable({ summary }: { summary: CgtSummary }) {
 
 // ── CGT Events Table ──────────────────────────────────────────────────────────
 
-function CgtEventsTable({ events, isLoading }: { events: CgtEvent[]; isLoading: boolean }) {
+function CgtEventsTable({ events, isLoading, sort, sortDir, onSort }: { 
+  events: CgtEvent[]; 
+  isLoading: boolean;
+  sort: string;
+  sortDir: 'asc' | 'desc';
+  onSort: (field: string) => void;
+}) {
   if (isLoading) return <TableLoader text="Loading disposal events…" />
+
+  const EVENT_COLS = [
+    { key: 'ticker', label: 'Ticker', align: 'left' },
+    { key: 'disposalDate', label: 'Disposal', align: 'right' },
+    { key: 'acquisitionDate', label: 'Acquisition', align: 'right' },
+    { key: 'holdingDays', label: 'Days', align: 'right' },
+    { key: 'quantity', label: 'Quantity', align: 'right' },
+    { key: 'proceeds', label: 'Proceeds', align: 'right' },
+    { key: 'costBase', label: 'Cost Base', align: 'right' },
+    { key: 'capitalGain', label: 'Gain / Loss', align: 'right' },
+    { key: 'discountApplied', label: 'Discount', align: 'right' },
+    { key: 'assessableGain', label: 'Assessable', align: 'right' },
+  ]
 
   return (
     <div className="bg-white rounded-xl border border-gray-200">
@@ -312,8 +365,17 @@ function CgtEventsTable({ events, isLoading }: { events: CgtEvent[]; isLoading: 
         <table className="w-full text-sm">
           <thead>
             <tr className="text-xs text-gray-400 border-b border-gray-100">
-              {['Ticker','Disposal','Acquisition','Days','Quantity','Proceeds','Cost Base','Gain / Loss','Discount','Assessable'].map(h => (
-                <th key={h} className="px-4 py-3 text-right first:text-left font-medium whitespace-nowrap">{h}</th>
+              {EVENT_COLS.map(col => (
+                <th key={col.key}
+                  className={`px-4 py-3 text-${col.align} font-medium whitespace-nowrap cursor-pointer hover:text-blue-600 select-none`}
+                  onClick={() => onSort(col.key)}>
+                  <span className="flex items-center gap-1 justify-between">
+                    {col.label}
+                    {sort === col.key && (
+                      sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                    )}
+                  </span>
+                </th>
               ))}
             </tr>
           </thead>
@@ -363,8 +425,26 @@ function CgtEventsTable({ events, isLoading }: { events: CgtEvent[]; isLoading: 
 
 // ── Open Parcels Table ────────────────────────────────────────────────────────
 
-function OpenParcelsTable({ parcels, isLoading }: { parcels: OpenParcel[]; isLoading: boolean }) {
+function OpenParcelsTable({ parcels, isLoading, sort, sortDir, onSort }: { 
+  parcels: OpenParcel[]; 
+  isLoading: boolean;
+  sort: string;
+  sortDir: 'asc' | 'desc';
+  onSort: (field: string) => void;
+}) {
   if (isLoading) return <TableLoader text="Loading open parcels…" />
+
+  const PARCEL_COLS = [
+    { key: 'ticker', label: 'Ticker', align: 'left' },
+    { key: 'quantity', label: 'Quantity', align: 'right' },
+    { key: 'costPerUnit', label: 'Cost/Unit', align: 'right' },
+    { key: 'totalCostBase', label: 'Cost Base', align: 'right' },
+    { key: 'acquisitionDate', label: 'Acquired', align: 'right' },
+    { key: 'holdingDays', label: 'Days', align: 'right' },
+    { key: 'cgtDiscountEligible', label: 'Discount', align: 'right' },
+    { key: 'currentPrice', label: 'Current Price', align: 'right' },
+    { key: 'unrealisedGain', label: 'Unrealised', align: 'right' },
+  ]
 
   return (
     <div className="bg-white rounded-xl border border-gray-200">
@@ -376,8 +456,17 @@ function OpenParcelsTable({ parcels, isLoading }: { parcels: OpenParcel[]; isLoa
         <table className="w-full text-sm">
           <thead>
             <tr className="text-xs text-gray-400 border-b border-gray-100">
-              {['Ticker','Quantity','Cost/Unit','Cost Base','Acquired','Days','Discount','Current Price','Unrealised'].map(h => (
-                <th key={h} className="px-4 py-3 text-right first:text-left font-medium whitespace-nowrap">{h}</th>
+              {PARCEL_COLS.map(col => (
+                <th key={col.key}
+                  className={`px-4 py-3 text-${col.align} font-medium whitespace-nowrap cursor-pointer hover:text-blue-600 select-none`}
+                  onClick={() => onSort(col.key)}>
+                  <span className="flex items-center gap-1 justify-between">
+                    {col.label}
+                    {sort === col.key && (
+                      sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                    )}
+                  </span>
+                </th>
               ))}
             </tr>
           </thead>

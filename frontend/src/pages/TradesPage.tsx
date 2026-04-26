@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
 import { Plus, Search, Download, Upload, TrendingUp, TrendingDown,
-         ArrowLeftRight, DollarSign, X, Loader2, Pencil, Trash2, CheckSquare, Square } from 'lucide-react'
+         ArrowLeftRight, DollarSign, X, Loader2, Pencil, Trash2, CheckSquare, Square, ChevronUp, ChevronDown } from 'lucide-react'
 import clsx from 'clsx'
 import api from '../lib/apiClient'
 
@@ -114,10 +114,15 @@ export default function TradesPage() {
     },
   })
 
+const [sortField, setSortField] = useState('tradeDate')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
   const { data, isLoading } = useQuery({
-    queryKey: ['trades', portfolioId, search, typeFilter, page],
+    queryKey: ['trades', portfolioId, search, typeFilter, page, sortField, sortDir],
     queryFn: async () => {
-      const params: Record<string, string> = { page: String(page), size: '25', sort: 'tradeDate,desc' }
+      const params: Record<string, string> = {
+        page: String(page), size: '25', sort: sortField, sortDir
+      }
       if (search) params.ticker = search
       if (typeFilter) params.tradeType = typeFilter
       const res = await api.get<TradesPage>(`/v1/portfolios/${portfolioId}/trades`, { params })
@@ -125,6 +130,17 @@ export default function TradesPage() {
     },
     enabled: !!portfolioId,
   })
+
+  const toggleSort = (col: typeof COLUMNS[0]) => {
+    if (col.isCalculated) return
+    const field = col.sortKey ?? col.key
+    if (sortField === field) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDir('desc')
+    }
+  }
 
   const toggleSelectAll = () => {
     if (!data?.content) return
@@ -144,6 +160,17 @@ export default function TradesPage() {
     }
     setSelectedTrades(newSet)
   }
+
+  const COLUMNS = [
+    { key: 'tradeDate', label: 'Date', align: 'left' },
+    { key: 'ticker', label: 'Security', align: 'left', sortKey: 'security.ticker' },
+    { key: 'tradeType', label: 'Type', align: 'left' },
+    { key: 'quantity', label: 'Quantity', align: 'right' },
+    { key: 'price', label: 'Price', align: 'right' },
+    { key: 'fees', label: 'Fees', align: 'right' },
+    { key: 'totalCost', label: 'Total', align: 'right', isCalculated: true },
+    { key: 'source', label: 'Source', align: 'left' },
+  ]
 
   return (
     <div className="p-8 space-y-5">
@@ -219,9 +246,19 @@ export default function TradesPage() {
                         {data?.content && selectedTrades.size === data.content.length ? <CheckSquare size={16} /> : <Square size={16} />}
                       </button>
                     </th>
-                    {['Date','Security','Type','Quantity','Price','Fees','Total','Source',''].map(h => (
-                      <th key={h} className="px-5 py-3 text-right first:text-left font-medium whitespace-nowrap">{h}</th>
+                    {COLUMNS.map(col => (
+                      <th key={col.key}
+                        className={`px-5 py-3 text-${col.align} font-medium whitespace-nowrap cursor-pointer hover:text-blue-600 select-none ${col.isCalculated ? 'cursor-not-allowed opacity-50' : ''}`}
+                        onClick={() => toggleSort(col)}>
+                        <span className="flex items-center gap-1 justify-between">
+                          {col.label}
+                          {!col.isCalculated && sortField === (col.sortKey ?? col.key) && (
+                            sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                          )}
+                        </span>
+                      </th>
                     ))}
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>

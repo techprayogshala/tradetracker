@@ -8,6 +8,15 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.math.BigDecimal;
@@ -79,21 +88,35 @@ public class TaxReportService {
     // ── CGT Events ────────────────────────────────────────────────────────────
 
     public List<CgtEventView> getCgtEvents(
-            String keycloakSub, UUID portfolioId, int financialYear) {
+            String keycloakSub, UUID portfolioId, int financialYear, String sort, String sortDir) {
         requireOwnership(keycloakSub, portfolioId);
-        return fetchDisposals(portfolioId, financialYear).stream().map(d -> {
+        var events = fetchDisposals(portfolioId, financialYear).stream().map(d -> {
             var result = toResult(d);
             return new CgtEventView(d.disposalDate(), d.ticker(),
                 d.quantityDisposed(), d.proceeds(), d.costBase(),
                 result.grossGain(), result.discountApplied(), result.assessableGain(),
                 d.acquisitionDate(),
                 (int) ChronoUnit.DAYS.between(d.acquisitionDate(), d.disposalDate()));
-        }).sorted(Comparator.comparing(CgtEventView::disposalDate)).toList();
+        }).toList();
+
+        Comparator<CgtEventView> cmp = switch (sort) {
+            case "ticker" -> Comparator.comparing(CgtEventView::ticker);
+            case "quantity" -> Comparator.comparing(CgtEventView::quantity);
+            case "proceeds" -> Comparator.comparing(CgtEventView::proceeds);
+            case "costBase" -> Comparator.comparing(CgtEventView::costBase);
+            case "capitalGain" -> Comparator.comparing(CgtEventView::capitalGain);
+            case "assessableGain" -> Comparator.comparing(CgtEventView::assessableGain);
+            default -> Comparator.comparing(CgtEventView::disposalDate);
+        };
+        if ("desc".equalsIgnoreCase(sortDir)) {
+            cmp = cmp.reversed();
+        }
+        return events.stream().sorted(cmp).toList();
     }
 
     // ── Open parcels ──────────────────────────────────────────────────────────
 
-    public List<OpenParcelView> getOpenParcels(String keycloakSub, UUID portfolioId) {
+    public List<OpenParcelView> getOpenParcels(String keycloakSub, UUID portfolioId, String sort, String sortDir) {
         requireOwnership(keycloakSub, portfolioId);
         List<TaxParcel> parcels = parcelRepo.findAllOpenByPortfolio(portfolioId);
         if (parcels.isEmpty()) return List.of();
@@ -102,7 +125,7 @@ public class TaxReportService {
         Map<UUID, BigDecimal> prices = priceService.getCurrentPrices(secIds);
         LocalDate today = LocalDate.now();
 
-        return parcels.stream().map(p -> {
+        var views = parcels.stream().map(p -> {
             BigDecimal price   = prices.getOrDefault(p.getSecurity().getId(), BigDecimal.ZERO);
             BigDecimal mkt     = price.multiply(p.getQuantityRemaining()).setScale(3, RoundingMode.HALF_UP);
             BigDecimal cost    = p.getCostPerUnit().multiply(p.getQuantityRemaining()).setScale(3, RoundingMode.HALF_UP);
@@ -115,6 +138,19 @@ public class TaxReportService {
                 (int) ChronoUnit.DAYS.between(p.getAcquisitionDate(), today),
                 p.isEligibleForCgtDiscount(today), price, gain, gainPct);
         }).toList();
+
+        Comparator<OpenParcelView> cmp = switch (sort) {
+            case "ticker" -> Comparator.comparing(OpenParcelView::ticker);
+            case "quantity" -> Comparator.comparing(OpenParcelView::quantity);
+            case "costPerUnit" -> Comparator.comparing(OpenParcelView::costPerUnit);
+            case "totalCostBase" -> Comparator.comparing(OpenParcelView::totalCostBase);
+            case "unrealisedGain" -> Comparator.comparing(OpenParcelView::unrealisedGain);
+            default -> Comparator.comparing(OpenParcelView::acquisitionDate);
+        };
+        if ("desc".equalsIgnoreCase(sortDir)) {
+            cmp = cmp.reversed();
+        }
+        return views.stream().sorted(cmp).toList();
     }
 
     // ── Dividend summary ──────────────────────────────────────────────────────

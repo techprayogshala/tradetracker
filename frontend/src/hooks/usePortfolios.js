@@ -29,16 +29,16 @@ export function usePortfolio(portfolioId) {
     });
 }
 // ── Holdings ──────────────────────────────────────────────────────────────────
-export function useHoldings(portfolioId) {
+export function useHoldings(portfolioId, sort = 'ticker', sortDir = 'asc') {
     return useQuery({
-        queryKey: ['holdings', portfolioId],
+        queryKey: ['holdings', portfolioId, sort, sortDir],
         queryFn: async () => {
-            const res = await api.get(`/v1/portfolios/${portfolioId}/holdings`);
+            const res = await api.get(`/v1/portfolios/${portfolioId}/holdings`, {
+                params: { sort, sortDir }
+            });
             return res.data;
         },
         enabled: !!portfolioId,
-        staleTime: 60000,
-        refetchOnWindowFocus: false,
     });
 }
 // ── Performance ───────────────────────────────────────────────────────────────
@@ -114,4 +114,14 @@ export function useNotificationPrefs() {
         onSuccess: () => qc.invalidateQueries({ queryKey: ['notification-prefs'] }),
     });
     return { ...query, toggle };
+}
+export function useOpenParcels(portfolioId, sort = 'acquisitionDate') {
+    return useQuery({
+        queryKey: ['open-parcels', portfolioId, sort],
+        queryFn: async () => {
+            const res = await api.get(`/v1/portfolios/${portfolioId}/tax/open-parcels`, { params: { sort } });
+            return res.data;
+        },
+        enabled: !!portfolioId,
+    });
 }

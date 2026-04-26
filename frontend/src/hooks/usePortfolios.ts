@@ -132,16 +132,16 @@ export function usePortfolio(portfolioId: string | undefined) {
 
 // ── Holdings ──────────────────────────────────────────────────────────────────
 
-export function useHoldings(portfolioId: string | undefined) {
+export function useHoldings(portfolioId: string | undefined, sort = 'ticker', sortDir = 'asc') {
   return useQuery({
-    queryKey: ['holdings', portfolioId],
+    queryKey: ['holdings', portfolioId, sort, sortDir],
     queryFn: async () => {
-      const res = await api.get<Holding[]>(`/v1/portfolios/${portfolioId}/holdings`)
+      const res = await api.get<Holding[]>(`/v1/portfolios/${portfolioId}/holdings`, {
+        params: { sort, sortDir }
+      })
       return res.data
     },
     enabled: !!portfolioId,
-    staleTime: 60000,
-    refetchOnWindowFocus: false,
   })
 }
 
@@ -245,5 +245,50 @@ export function useNotificationPrefs() {
   })
 
   return { ...query, toggle }
+}
+
+// ── Open Tax Parcels ─────────────────────────────────────────────────────
+
+export interface OpenParcel {
+  parcelId: string
+  ticker: string
+  quantity: number
+  costPerUnit: number
+  costBase: number
+  acquisitionDate: string
+  holdingDays: number
+  cgtDiscountEligible: boolean
+  currentPrice: number
+  unrealisedGain: number
+  unrealisedGainPct: number
+}
+
+export function useOpenParcels(portfolioId: string | undefined, sort = 'acquisitionDate') {
+  return useQuery({
+    queryKey: ['open-parcels', portfolioId, sort],
+    queryFn: async () => {
+      const res = await api.get<OpenParcel[]>(
+        `/v1/portfolios/${portfolioId}/tax/open-parcels`,
+        { params: { sort } }
+      )
+      return res.data
+    },
+    enabled: !!portfolioId,
+  })
+}
+
+// ── CGT Events ───────────────────────────────────────────────────────
+
+export interface CgtEvent {
+  disposalDate: string
+  ticker: string
+  quantity: number
+  proceeds: number
+  costBase: number
+  capitalGain: number
+  discountApplied: boolean
+  assessableGain: number
+  acquisitionDate: string
+  holdingDays: number
 }
 

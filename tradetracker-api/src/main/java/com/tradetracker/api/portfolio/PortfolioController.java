@@ -109,8 +109,10 @@ public class PortfolioController {
     @Operation(summary = "Current holdings enriched with market price and unrealised P&L")
     public List<HoldingView> holdings(
             @AuthenticationPrincipal Jwt jwt,
-            @PathVariable UUID portfolioId) {
-        return svc.getHoldings(jwt.getSubject(), portfolioId);
+            @PathVariable UUID portfolioId,
+            @RequestParam(defaultValue = "ticker") String sort,
+            @RequestParam(defaultValue = "asc") String sortDir) {
+        return svc.getHoldings(jwt.getSubject(), portfolioId, sort, sortDir);
     }
 
     // ── Trades ────────────────────────────────────────────────────────────────
@@ -124,10 +126,13 @@ public class PortfolioController {
             @RequestParam(required = false) String tradeType,
             @RequestParam(required = false) LocalDate from,
             @RequestParam(required = false) LocalDate to,
+            @RequestParam(defaultValue = "tradeDate") String sort,
+            @RequestParam(defaultValue = "desc") String sortDir,
             @RequestParam(defaultValue = "0")  int page,
             @RequestParam(defaultValue = "25") int size) {
 
-        var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "tradeDate"));
+        var direction = "asc".equalsIgnoreCase(sortDir) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        var pageable = PageRequest.of(page, size, Sort.by(direction, sort));
         return svc.listTrades(jwt.getSubject(), portfolioId, ticker, tradeType, from, to, pageable)
             .map(t -> new TradeDto(
                 t.getId(),

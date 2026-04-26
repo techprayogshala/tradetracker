@@ -24,7 +24,6 @@ public interface TradeEventRepository extends JpaRepository<TradeEvent, UUID> {
               AND (:type IS NULL OR t.tradeType = :type)
               AND (:fromDate IS NULL OR t.tradeDate >= :fromDate)
               AND (:toDate IS NULL OR t.tradeDate <= :toDate)
-            ORDER BY t.tradeDate DESC, t.createdAt DESC
             """)
     Page<TradeEvent> findFiltered(
             @Param("portfolioId") UUID portfolioId,

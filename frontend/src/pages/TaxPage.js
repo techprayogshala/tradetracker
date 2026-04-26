@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
-import { Download, TrendingUp, TrendingDown, Shield, AlertCircle, Loader2, ChevronDown } from 'lucide-react';
+import { Download, TrendingUp, TrendingDown, Shield, AlertCircle, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import clsx from 'clsx';
 import api from '../lib/apiClient';
 // Current ATO financial year: runs 1 Jul – 30 Jun
@@ -17,6 +17,28 @@ export default function TaxPage() {
     const { portfolioId } = useParams();
     const [fy, setFy] = useState(currentFY());
     const [tab, setTab] = useState('summary');
+    const [eventSort, setEventSort] = useState('disposalDate');
+    const [eventSortDir, setEventSortDir] = useState('desc');
+    const [parcelSort, setParcelSort] = useState('acquisitionDate');
+    const [parcelSortDir, setParcelSortDir] = useState('desc');
+    const toggleEventSort = (field) => {
+        if (eventSort === field) {
+            setEventSortDir(eventSortDir === 'asc' ? 'desc' : 'asc');
+        }
+        else {
+            setEventSort(field);
+            setEventSortDir('desc');
+        }
+    };
+    const toggleParcelSort = (field) => {
+        if (parcelSort === field) {
+            setParcelSortDir(parcelSortDir === 'asc' ? 'desc' : 'asc');
+        }
+        else {
+            setParcelSort(field);
+            setParcelSortDir('desc');
+        }
+    };
     const summaryQ = useQuery({
         queryKey: ['cgt-summary', portfolioId, fy],
         queryFn: async () => {
@@ -26,17 +48,17 @@ export default function TaxPage() {
         enabled: !!portfolioId,
     });
     const eventsQ = useQuery({
-        queryKey: ['cgt-events', portfolioId, fy],
+        queryKey: ['cgt-events', portfolioId, fy, eventSort, eventSortDir],
         queryFn: async () => {
-            const r = await api.get(`/v1/portfolios/${portfolioId}/tax/cgt-events`, { params: { financialYear: fy } });
+            const r = await api.get(`/v1/portfolios/${portfolioId}/tax/cgt-events`, { params: { financialYear: fy, sort: eventSort, sortDir: eventSortDir } });
             return r.data;
         },
         enabled: !!portfolioId && tab === 'events',
     });
     const parcelsQ = useQuery({
-        queryKey: ['open-parcels', portfolioId],
+        queryKey: ['open-parcels', portfolioId, parcelSort, parcelSortDir],
         queryFn: async () => {
-            const r = await api.get(`/v1/portfolios/${portfolioId}/tax/open-parcels`);
+            const r = await api.get(`/v1/portfolios/${portfolioId}/tax/open-parcels`, { params: { sort: parcelSort, sortDir: parcelSortDir } });
             return r.data;
         },
         enabled: !!portfolioId && tab === 'parcels',
@@ -63,7 +85,7 @@ export default function TaxPage() {
                             ? 'border-blue-600 text-blue-600'
                             : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'), children: t === 'summary' ? 'CGT Breakdown'
                             : t === 'events' ? `Disposal Events FY${fy}`
-                                : 'Open Parcels' }, t))) }) }), tab === 'summary' && summaryQ.data && (_jsx(CgtBreakdownTable, { summary: summaryQ.data })), tab === 'events' && (_jsx(CgtEventsTable, { events: eventsQ.data ?? [], isLoading: eventsQ.isLoading })), tab === 'parcels' && (_jsx(OpenParcelsTable, { parcels: parcelsQ.data ?? [], isLoading: parcelsQ.isLoading }))] }));
+                                : 'Open Parcels' }, t))) }) }), tab === 'summary' && summaryQ.data && (_jsx(CgtBreakdownTable, { summary: summaryQ.data })), tab === 'events' && (_jsx(CgtEventsTable, { events: eventsQ.data ?? [], isLoading: eventsQ.isLoading, sort: eventSort, sortDir: eventSortDir, onSort: toggleEventSort })), tab === 'parcels' && (_jsx(OpenParcelsTable, { parcels: parcelsQ.data ?? [], isLoading: parcelsQ.isLoading, sort: parcelSort, sortDir: parcelSortDir, onSort: toggleParcelSort }))] }));
 }
 // ── CGT Summary Cards ─────────────────────────────────────────────────────────
 function CgtSummaryCards({ summary }) {
@@ -91,10 +113,22 @@ function CgtBreakdownTable({ summary }) {
     return (_jsxs("div", { className: "bg-white rounded-xl border border-gray-200 overflow-hidden max-w-2xl", children: [_jsx("div", { className: "px-6 py-4 border-b border-gray-100", children: _jsxs("h2", { className: "text-sm font-semibold text-gray-700", children: ["CGT Calculation \u2014 FY ", summary.financialYear - 1, "\u2013", summary.financialYear] }) }), _jsx("table", { className: "w-full text-sm", children: _jsx("tbody", { children: rows.map((row, i) => row === null ? (_jsx("tr", { children: _jsx("td", { colSpan: 2, className: "border-t border-gray-200" }) }, i)) : (_jsxs("tr", { className: clsx('border-b border-gray-50 last:border-0', row.bold && 'bg-gray-50'), children: [_jsx("td", { className: clsx('px-6 py-3 text-gray-600', row.indent && 'pl-10 text-gray-400'), children: row.label }), _jsx("td", { className: clsx('px-6 py-3 text-right tabular-nums', row.bold ? 'font-semibold text-gray-900' : 'text-gray-700', row.value > 0 && !row.bold && 'text-emerald-600', row.value < 0 && 'text-red-500'), children: row.value >= 0 ? fmtCcy(row.value) : `(${fmtCcy(Math.abs(row.value))})` })] }, i))) }) })] }));
 }
 // ── CGT Events Table ──────────────────────────────────────────────────────────
-function CgtEventsTable({ events, isLoading }) {
+function CgtEventsTable({ events, isLoading, sort, sortDir, onSort }) {
     if (isLoading)
         return _jsx(TableLoader, { text: "Loading disposal events\u2026" });
-    return (_jsx("div", { className: "bg-white rounded-xl border border-gray-200", children: _jsx("div", { className: "overflow-x-auto", children: _jsxs("table", { className: "w-full text-sm", children: [_jsx("thead", { children: _jsx("tr", { className: "text-xs text-gray-400 border-b border-gray-100", children: ['Ticker', 'Disposal', 'Acquisition', 'Days', 'Quantity', 'Proceeds', 'Cost Base', 'Gain / Loss', 'Discount', 'Assessable'].map(h => (_jsx("th", { className: "px-4 py-3 text-right first:text-left font-medium whitespace-nowrap", children: h }, h))) }) }), _jsxs("tbody", { children: [events.map((e, i) => {
+    const EVENT_COLS = [
+        { key: 'ticker', label: 'Ticker', align: 'left' },
+        { key: 'disposalDate', label: 'Disposal', align: 'right' },
+        { key: 'acquisitionDate', label: 'Acquisition', align: 'right' },
+        { key: 'holdingDays', label: 'Days', align: 'right' },
+        { key: 'quantity', label: 'Quantity', align: 'right' },
+        { key: 'proceeds', label: 'Proceeds', align: 'right' },
+        { key: 'costBase', label: 'Cost Base', align: 'right' },
+        { key: 'capitalGain', label: 'Gain / Loss', align: 'right' },
+        { key: 'discountApplied', label: 'Discount', align: 'right' },
+        { key: 'assessableGain', label: 'Assessable', align: 'right' },
+    ];
+    return (_jsx("div", { className: "bg-white rounded-xl border border-gray-200", children: _jsx("div", { className: "overflow-x-auto", children: _jsxs("table", { className: "w-full text-sm", children: [_jsx("thead", { children: _jsx("tr", { className: "text-xs text-gray-400 border-b border-gray-100", children: EVENT_COLS.map(col => (_jsx("th", { className: `px-4 py-3 text-${col.align} font-medium whitespace-nowrap cursor-pointer hover:text-blue-600 select-none`, onClick: () => onSort(col.key), children: _jsxs("span", { className: "flex items-center gap-1 justify-between", children: [col.label, sort === col.key && (sortDir === 'asc' ? _jsx(ChevronUp, { size: 14 }) : _jsx(ChevronDown, { size: 14 }))] }) }, col.key))) }) }), _jsxs("tbody", { children: [events.map((e, i) => {
                                 const isGain = e.capitalGain >= 0;
                                 return (_jsxs("tr", { className: "border-b border-gray-50 last:border-0 hover:bg-gray-50/40", children: [_jsx("td", { className: "px-4 py-3 font-semibold text-gray-900", children: e.ticker }), _jsx("td", { className: "px-4 py-3 text-right text-gray-500 whitespace-nowrap", children: format(parseISO(e.disposalDate), 'dd MMM yyyy') }), _jsx("td", { className: "px-4 py-3 text-right text-gray-400 whitespace-nowrap", children: format(parseISO(e.acquisitionDate), 'dd MMM yyyy') }), _jsx("td", { className: "px-4 py-3 text-right text-gray-400", children: e.holdingDays }), _jsx("td", { className: "px-4 py-3 text-right tabular-nums text-gray-600", children: e.quantity.toLocaleString() }), _jsx("td", { className: "px-4 py-3 text-right tabular-nums text-gray-700", children: fmtCcy(e.proceeds) }), _jsx("td", { className: "px-4 py-3 text-right tabular-nums text-gray-600", children: fmtCcy(e.costBase) }), _jsxs("td", { className: clsx('px-4 py-3 text-right tabular-nums font-medium', isGain ? 'text-emerald-600' : 'text-red-500'), children: [isGain ? '+' : '', fmtCcy(e.capitalGain)] }), _jsx("td", { className: "px-4 py-3 text-right", children: e.discountApplied
                                                 ? _jsx("span", { className: "inline-block px-1.5 py-0.5 text-xs bg-emerald-50 text-emerald-700 rounded", children: "50%" })
@@ -102,10 +136,21 @@ function CgtEventsTable({ events, isLoading }) {
                             }), events.length === 0 && (_jsx("tr", { children: _jsx("td", { colSpan: 10, className: "px-4 py-10 text-center text-gray-400", children: "No disposal events for this financial year." }) }))] })] }) }) }));
 }
 // ── Open Parcels Table ────────────────────────────────────────────────────────
-function OpenParcelsTable({ parcels, isLoading }) {
+function OpenParcelsTable({ parcels, isLoading, sort, sortDir, onSort }) {
     if (isLoading)
         return _jsx(TableLoader, { text: "Loading open parcels\u2026" });
-    return (_jsxs("div", { className: "bg-white rounded-xl border border-gray-200", children: [_jsxs("div", { className: "px-6 py-3 border-b border-gray-100 flex items-center justify-between", children: [_jsx("span", { className: "text-sm font-semibold text-gray-700", children: "Open Tax Parcels" }), _jsxs("span", { className: "text-xs text-gray-400", children: [parcels.length, " parcels"] })] }), _jsx("div", { className: "overflow-x-auto", children: _jsxs("table", { className: "w-full text-sm", children: [_jsx("thead", { children: _jsx("tr", { className: "text-xs text-gray-400 border-b border-gray-100", children: ['Ticker', 'Quantity', 'Cost/Unit', 'Cost Base', 'Acquired', 'Days', 'Discount', 'Current Price', 'Unrealised'].map(h => (_jsx("th", { className: "px-4 py-3 text-right first:text-left font-medium whitespace-nowrap", children: h }, h))) }) }), _jsxs("tbody", { children: [parcels.map(p => {
+    const PARCEL_COLS = [
+        { key: 'ticker', label: 'Ticker', align: 'left' },
+        { key: 'quantity', label: 'Quantity', align: 'right' },
+        { key: 'costPerUnit', label: 'Cost/Unit', align: 'right' },
+        { key: 'totalCostBase', label: 'Cost Base', align: 'right' },
+        { key: 'acquisitionDate', label: 'Acquired', align: 'right' },
+        { key: 'holdingDays', label: 'Days', align: 'right' },
+        { key: 'cgtDiscountEligible', label: 'Discount', align: 'right' },
+        { key: 'currentPrice', label: 'Current Price', align: 'right' },
+        { key: 'unrealisedGain', label: 'Unrealised', align: 'right' },
+    ];
+    return (_jsxs("div", { className: "bg-white rounded-xl border border-gray-200", children: [_jsxs("div", { className: "px-6 py-3 border-b border-gray-100 flex items-center justify-between", children: [_jsx("span", { className: "text-sm font-semibold text-gray-700", children: "Open Tax Parcels" }), _jsxs("span", { className: "text-xs text-gray-400", children: [parcels.length, " parcels"] })] }), _jsx("div", { className: "overflow-x-auto", children: _jsxs("table", { className: "w-full text-sm", children: [_jsx("thead", { children: _jsx("tr", { className: "text-xs text-gray-400 border-b border-gray-100", children: PARCEL_COLS.map(col => (_jsx("th", { className: `px-4 py-3 text-${col.align} font-medium whitespace-nowrap cursor-pointer hover:text-blue-600 select-none`, onClick: () => onSort(col.key), children: _jsxs("span", { className: "flex items-center gap-1 justify-between", children: [col.label, sort === col.key && (sortDir === 'asc' ? _jsx(ChevronUp, { size: 14 }) : _jsx(ChevronDown, { size: 14 }))] }) }, col.key))) }) }), _jsxs("tbody", { children: [parcels.map(p => {
                                     const pos = p.unrealisedGain >= 0;
                                     return (_jsxs("tr", { className: "border-b border-gray-50 last:border-0 hover:bg-gray-50/40", children: [_jsx("td", { className: "px-4 py-3 font-semibold text-gray-900", children: p.ticker }), _jsx("td", { className: "px-4 py-3 text-right tabular-nums text-gray-700", children: p.quantity.toLocaleString() }), _jsx("td", { className: "px-4 py-3 text-right tabular-nums text-gray-600", children: fmtCcy(p.costPerUnit) }), _jsx("td", { className: "px-4 py-3 text-right tabular-nums text-gray-700", children: fmtCcy(p.totalCostBase) }), _jsx("td", { className: "px-4 py-3 text-right text-gray-500 whitespace-nowrap", children: format(parseISO(p.acquisitionDate), 'dd MMM yyyy') }), _jsx("td", { className: "px-4 py-3 text-right text-gray-400", children: p.holdingDays }), _jsx("td", { className: "px-4 py-3 text-right", children: p.cgtDiscountEligible
                                                     ? _jsxs("span", { className: "inline-flex items-center gap-1 px-1.5 py-0.5 text-xs bg-emerald-50 text-emerald-700 rounded", children: [_jsx(Shield, { size: 9 }), " Eligible"] })

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
-import { ChevronRight, TrendingUp, TrendingDown, Shield, Layers, Loader2 } from 'lucide-react'
+import { ChevronRight, TrendingUp, TrendingDown, Shield, Layers, Loader2, ChevronUp, ChevronDown } from 'lucide-react'
 import clsx from 'clsx'
 import {
   useHoldings,
@@ -48,9 +48,28 @@ function useOpenParcels(portfolioId: string | undefined) {
 export default function PortfolioPage() {
   const { portfolioId } = useParams<{ portfolioId: string }>()
   const [selected, setSelected] = useState<string | null>(null)
+  const [sort, setSort] = useState('ticker')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
-  const { data: holdings = [], isLoading } = useHoldings(portfolioId)
+  const { data: holdings = [], isLoading } = useHoldings(portfolioId, sort, sortDir)
   const { data: allParcels = [] }          = useOpenParcels(portfolioId)
+
+  const HOLDING_COLS = [
+    { key: 'ticker', label: 'Security' },
+    { key: 'quantity', label: 'Qty' },
+    { key: 'currentPrice', label: 'Price' },
+    { key: 'marketValue', label: 'Value' },
+    { key: 'unrealisedGain', label: 'Gain' },
+  ]
+
+  const toggleSort = (key: string) => {
+    if (sort === key) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSort(key)
+      setSortDir('asc')
+    }
+  }
 
   // Group parcels by ticker for the detail panel
   const parcelsByTicker = allParcels.reduce<Record<string, OpenParcel[]>>((acc, p) => {
@@ -94,7 +113,24 @@ export default function PortfolioPage() {
               <span className="text-sm font-semibold text-gray-700">
                 {holdings.length} position{holdings.length !== 1 ? 's' : ''}
               </span>
-              <span className="text-xs text-gray-400">Click a row to see parcels</span>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-gray-400">Sort:</span>
+                {HOLDING_COLS.map(col => (
+                  <button
+                    key={col.key}
+                    onClick={() => toggleSort(col.key)}
+                    className={clsx(
+                      'px-2 py-1 rounded transition-colors flex items-center gap-1',
+                      sort === col.key ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100 text-gray-500'
+                    )}
+                  >
+                    {col.label}
+                    {sort === col.key && (
+                      sortDir === 'asc' ? '↑' : '↓'
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="divide-y divide-gray-50">

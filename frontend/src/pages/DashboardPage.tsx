@@ -9,9 +9,30 @@ const PERIODS = ['1M', '3M', '6M', '1Y', '3Y', 'ALL']
 
 export default function DashboardPage() {
   const { activePortfolio } = usePortfolios()
-  const { data: holdings = [] } = useHoldings(activePortfolio?.id ?? '')
+  const [sort, setSort] = useState('ticker')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const { data: holdings = [] } = useHoldings(activePortfolio?.id ?? '', sort, sortDir)
   const [period, setPeriod] = useState('1Y')
   const { data: perf } = usePerformance(activePortfolio?.id ?? '', period)
+
+  const COLS = [
+    { key: 'ticker', label: 'Security' },
+    { key: 'quantity', label: 'Quantity' },
+    { key: 'averageCostPerUnit', label: 'Avg Cost' },
+    { key: 'currentPrice', label: 'Current Price' },
+    { key: 'marketValue', label: 'Market Value' },
+    { key: 'unrealisedGain', label: 'Gain / Loss' },
+    { key: 'unrealisedGainPct', label: '%' },
+  ]
+
+  const toggleSort = (key: string) => {
+    if (sort === key) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSort(key)
+      setSortDir('asc')
+    }
+  }
 
   if (!activePortfolio) {
     return (
@@ -132,10 +153,14 @@ export default function DashboardPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-400 border-b border-gray-100">
-                {['Security', 'Quantity', 'Avg Cost', 'Current Price',
-                  'Market Value', 'Gain / Loss', '%'].map(h => (
-                  <th key={h} className="px-6 py-3 text-right first:text-left font-medium">
-                    {h}
+                {COLS.map(col => (
+                  <th key={col.key}
+                    className="px-6 py-3 text-right first:text-left font-medium cursor-pointer hover:text-blue-600 select-none"
+                    onClick={() => toggleSort(col.key)}>
+                    <span className="flex items-center gap-1 justify-end first:justify-start">
+                      {col.label}
+                      {sort === col.key && (sortDir === 'asc' ? '↑' : '↓')}
+                    </span>
                   </th>
                 ))}
               </tr>

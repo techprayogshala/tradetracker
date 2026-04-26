@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -188,7 +189,7 @@ public class PortfolioService {
      */
     @Transactional(readOnly = true)
     // @Cacheable(value = "holdings", key = "#portfolioId") // Disabled - causes Jackson deserialization issues
-    public List<HoldingView> getHoldings(String keycloakSub, UUID portfolioId) {
+    public List<HoldingView> getHoldings(String keycloakSub, UUID portfolioId, String sort, String sortDir) {
         requirePortfolio(keycloakSub, portfolioId);
 
         List<TaxParcelRepository.HoldingAggregation> aggregations =
@@ -215,7 +216,7 @@ public class PortfolioService {
                 (a, b) -> a.isBefore(b) ? a : b   // keep earliest
             ));
 
-        return aggregations.stream().map(agg -> {
+        var views = aggregations.stream().map(agg -> {
             Security security    = securities.get(agg.getSecurityId());
             BigDecimal price     = prices.getOrDefault(agg.getSecurityId(), BigDecimal.ZERO);
             BigDecimal marketValue = price.multiply(agg.getTotalQuantity())
@@ -244,6 +245,21 @@ public class PortfolioService {
                 oldestDates.get(agg.getSecurityId())
             );
         }).toList();
+
+        Comparator<HoldingView> cmp = switch (sort) {
+            case "quantity" -> Comparator.comparing(HoldingView::quantity);
+            case "currentPrice" -> Comparator.comparing(HoldingView::currentPrice);
+            case "marketValue" -> Comparator.comparing(HoldingView::marketValue);
+            case "costBase" -> Comparator.comparing(HoldingView::costBase);
+            case "unrealisedGain" -> Comparator.comparing(HoldingView::unrealisedGain);
+            case "unrealisedGainPct" -> Comparator.comparing(HoldingView::unrealisedGainPct);
+            case "averageCostPerUnit" -> Comparator.comparing(HoldingView::averageCostPerUnit);
+            default -> Comparator.comparing(HoldingView::ticker);
+        };
+        if ("desc".equalsIgnoreCase(sortDir)) {
+            cmp = cmp.reversed();
+        }
+        return views.stream().sorted(cmp).toList();
     }
 
     // ── Trades ───────────────────────────────────────────────────────────────
@@ -507,8 +523,7 @@ public class PortfolioService {
     // ── Portfolio summary ────────────────────────────────────────────────────
 
     private PortfolioSummary toSummary(Portfolio p) {
-        // Use self (the Spring proxy) so @Cacheable on getHoldings is properly intercepted.
-        List<HoldingView> holdings = self.getHoldings(p.getUser().getKeycloakSub(), p.getId());
+        List<HoldingView> holdings = self.getHoldings(p.getUser().getKeycloakSub(), p.getId(), "ticker", "asc");
         BigDecimal totalValue    = holdings.stream().map(HoldingView::marketValue)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal totalCostBase = holdings.stream().map(HoldingView::costBase)
