@@ -69,6 +69,15 @@ function PortfoliosTab() {
     const qc = useQueryClient();
     const [creating, setCreating] = useState(false);
     const [name, setName] = useState('');
+    const [editing, setEditing] = useState(null);
+    const [strategy, setStrategy] = useState('');
+    const STRATEGIES = [
+        { value: 'FIFO', label: 'FIFO (First In, First Out)' },
+        { value: 'LIFO', label: 'LIFO (Last In, First Out)' },
+        { value: 'MAXIMISE_GAIN', label: 'Maximize Gain' },
+        { value: 'MINIMISE_GAIN', label: 'Minimize Gain' },
+        { value: 'MINIMISE_CGT', label: 'Minimize CGT (Tax Optimal)' },
+    ];
     const createMutation = useMutation({
         mutationFn: () => api.post('/v1/portfolios', {
             name, baseCurrency: 'AUD', parcelMatchingStrategy: 'FIFO'
@@ -79,7 +88,17 @@ function PortfoliosTab() {
             setCreating(false);
         },
     });
-    return (_jsx(Card, { title: "Portfolios", action: _jsx("button", { onClick: () => setCreating(true), className: "text-sm text-blue-600 hover:underline", children: "+ New" }), children: _jsxs("div", { className: "space-y-2", children: [portfolios.map(p => (_jsxs("div", { className: "flex items-center justify-between py-3 px-4 bg-gray-50 rounded-xl", children: [_jsxs("div", { children: [_jsxs("div", { className: "font-medium text-gray-900 text-sm flex items-center gap-2", children: [p.name, p.isDefault && (_jsx("span", { className: "text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded", children: "Default" }))] }), _jsxs("div", { className: "text-xs text-gray-400", children: [p.baseCurrency, " \u00B7 ", p.parcelMatchingStrategy] })] }), _jsx("div", { className: "text-sm font-semibold text-gray-700", children: new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' })
+    const updateMutation = useMutation({
+        mutationFn: ({ id, strategy }) => api.put(`/v1/portfolios/${id}`, { parcelMatchingStrategy: strategy }),
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: ['portfolios'] });
+            setEditing(null);
+        },
+    });
+    return (_jsx(Card, { title: "Portfolios", action: _jsx("button", { onClick: () => setCreating(true), className: "text-sm text-blue-600 hover:underline", children: "+ New" }), children: _jsxs("div", { className: "space-y-2", children: [portfolios.map(p => (_jsxs("div", { className: "flex items-center justify-between py-3 px-4 bg-gray-50 rounded-xl", children: [_jsxs("div", { children: [_jsxs("div", { className: "font-medium text-gray-900 text-sm flex items-center gap-2", children: [p.name, p.isDefault && (_jsx("span", { className: "text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded", children: "Default" }))] }), _jsx("div", { className: "text-xs text-gray-400 flex items-center gap-2", children: editing === p.id ? (_jsx("select", { value: strategy || p.parcelMatchingStrategy, onChange: e => {
+                                            setStrategy(e.target.value);
+                                            updateMutation.mutate({ id: p.id, strategy: e.target.value });
+                                        }, disabled: updateMutation.isPending, className: "mt-1 text-xs border border-gray-300 rounded px-2 py-1 bg-white", children: STRATEGIES.map(s => (_jsx("option", { value: s.value, children: s.label }, s.value))) })) : (_jsxs("button", { onClick: () => { setEditing(p.id); setStrategy(p.parcelMatchingStrategy); }, className: "hover:text-blue-600", children: [p.baseCurrency, " \u00B7 ", p.parcelMatchingStrategy] })) })] }), _jsx("div", { className: "text-sm font-semibold text-gray-700", children: new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' })
                                 .format(p.totalValue ?? 0) })] }, p.id))), portfolios.length === 0 && (_jsx("p", { className: "text-sm text-gray-400 py-4 text-center", children: "No portfolios yet." })), creating && (_jsxs("div", { className: "flex items-center gap-2 pt-2", children: [_jsx("input", { autoFocus: true, type: "text", placeholder: "Portfolio name", value: name, onChange: e => setName(e.target.value), onKeyDown: e => e.key === 'Enter' && name.trim() && createMutation.mutate(), className: "flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" }), _jsx("button", { onClick: () => createMutation.mutate(), disabled: !name.trim() || createMutation.isPending, className: "p-2 bg-blue-600 text-white rounded-lg disabled:opacity-50 hover:bg-blue-700", children: createMutation.isPending ? _jsx(Loader2, { size: 14, className: "animate-spin" }) : _jsx(Check, { size: 14 }) }), _jsx("button", { onClick: () => setCreating(false), className: "p-2 border border-gray-200 rounded-lg hover:bg-gray-50", children: _jsx(X, { size: 14, className: "text-gray-400" }) })] }))] }) }));
 }
 // =============================================================================

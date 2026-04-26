@@ -58,3 +58,34 @@ class MinimiseCgtMatchingStrategy implements ParcelMatchingStrategy {
         return 2;
     }
 }
+
+// ===========================================================================
+// MAXIMISE_GAIN — Highest gain first (sell most appreciated parcels first)
+// ===========================================================================
+@Component("MAXIMISE_GAIN")
+class MaximiseGainMatchingStrategy implements ParcelMatchingStrategy {
+    @Override public String strategyName() { return "MAXIMISE_GAIN"; }
+    @Override
+    public List<ParcelAllocation> match(SellEvent sell, List<OpenParcel> parcels) {
+        return allocate(sell, parcels.stream()
+            .sorted(Comparator
+                .comparing((OpenParcel p) -> p.gainPerUnit(sell.pricePerUnit())).reversed()
+                .thenComparing(OpenParcel::acquisitionDate))
+            .toList());
+    }
+}
+
+// ===========================================================================
+// MINIMISE_GAIN — Lowest gain (or highest loss) first
+// ===========================================================================
+@Component("MINIMISE_GAIN")
+class MinimiseGainMatchingStrategy implements ParcelMatchingStrategy {
+    @Override public String strategyName() { return "MINIMISE_GAIN"; }
+    @Override
+    public List<ParcelAllocation> match(SellEvent sell, List<OpenParcel> parcels) {
+        return allocate(sell, parcels.stream()
+            .sorted(Comparator
+                .comparing((OpenParcel p) -> p.gainPerUnit(sell.pricePerUnit())))
+            .toList());
+    }
+}

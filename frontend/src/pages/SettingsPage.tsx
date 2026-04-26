@@ -169,6 +169,16 @@ function PortfoliosTab() {
   const qc = useQueryClient()
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
+  const [editing, setEditing] = useState<string | null>(null)
+  const [strategy, setStrategy] = useState('')
+
+  const STRATEGIES = [
+    { value: 'FIFO', label: 'FIFO (First In, First Out)' },
+    { value: 'LIFO', label: 'LIFO (Last In, First Out)' },
+    { value: 'MAXIMISE_GAIN', label: 'Maximize Gain' },
+    { value: 'MINIMISE_GAIN', label: 'Minimize Gain' },
+    { value: 'MINIMISE_CGT', label: 'Minimize CGT (Tax Optimal)' },
+  ]
 
   const createMutation = useMutation({
     mutationFn: () => api.post('/v1/portfolios', {
@@ -177,6 +187,15 @@ function PortfoliosTab() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['portfolios'] })
       setName(''); setCreating(false)
+    },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, strategy }: { id: string; strategy: string }) =>
+      api.put(`/v1/portfolios/${id}`, { parcelMatchingStrategy: strategy }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['portfolios'] })
+      setEditing(null)
     },
   })
 
@@ -194,8 +213,29 @@ function PortfoliosTab() {
                   <span className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">Default</span>
                 )}
               </div>
-              <div className="text-xs text-gray-400">
-                {p.baseCurrency} · {p.parcelMatchingStrategy}
+              <div className="text-xs text-gray-400 flex items-center gap-2">
+                {editing === p.id ? (
+                  <select
+                    value={strategy || p.parcelMatchingStrategy}
+                    onChange={e => {
+                      setStrategy(e.target.value)
+                      updateMutation.mutate({ id: p.id, strategy: e.target.value })
+                    }}
+                    disabled={updateMutation.isPending}
+                    className="mt-1 text-xs border border-gray-300 rounded px-2 py-1 bg-white"
+                  >
+                    {STRATEGIES.map(s => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <button
+                    onClick={() => { setEditing(p.id); setStrategy(p.parcelMatchingStrategy) }}
+                    className="hover:text-blue-600"
+                  >
+                    {p.baseCurrency} · {p.parcelMatchingStrategy}
+                  </button>
+                )}
               </div>
             </div>
             <div className="text-sm font-semibold text-gray-700">

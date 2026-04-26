@@ -35,7 +35,7 @@ public class Portfolio extends BaseEntity {
     private List<TradeEvent> tradeEvents = new ArrayList<>();
 
     public enum ParcelMatchingStrategy {
-        FIFO, LIFO, MINIMISE_CGT, SPECIFIC_PARCEL
+        FIFO, LIFO, MAXIMISE_GAIN, MINIMISE_GAIN, MINIMISE_CGT, SPECIFIC_PARCEL
     }
 
     protected Portfolio() {}
