@@ -16,13 +16,13 @@ export default function DashboardPage() {
   const { data: perf } = usePerformance(activePortfolio?.id ?? '', period)
 
   const COLS = [
-    { key: 'ticker', label: 'Security' },
-    { key: 'quantity', label: 'Quantity' },
-    { key: 'averageCostPerUnit', label: 'Avg Cost' },
-    { key: 'currentPrice', label: 'Current Price' },
-    { key: 'marketValue', label: 'Market Value' },
-    { key: 'unrealisedGain', label: 'Gain / Loss' },
-    { key: 'unrealisedGainPct', label: '%' },
+    { key: 'ticker', label: 'Security', align: 'left', width: 'flex-1' },
+    { key: 'quantity', label: 'Quantity', align: 'right', width: 'w-28' },
+    { key: 'averageCostPerUnit', label: 'Avg Cost', align: 'right', width: 'w-28' },
+    { key: 'currentPrice', label: 'Current Price', align: 'right', width: 'w-28' },
+    { key: 'marketValue', label: 'Market Value', align: 'right', width: 'w-32' },
+    { key: 'unrealisedGain', label: 'Gain / Loss', align: 'right', width: 'w-32' },
+    { key: 'unrealisedGainPct', label: '%', align: 'right', width: 'w-20' },
   ]
 
   const toggleSort = (key: string) => {
@@ -33,6 +33,8 @@ export default function DashboardPage() {
       setSortDir('asc')
     }
   }
+
+  const cellAlign = (align: string) => align === 'right' ? 'text-right' : 'text-left'
 
   if (!activePortfolio) {
     return (
@@ -155,9 +157,9 @@ export default function DashboardPage() {
               <tr className="text-xs text-gray-400 border-b border-gray-100">
                 {COLS.map(col => (
                   <th key={col.key}
-                    className="px-6 py-3 text-right first:text-left font-medium cursor-pointer hover:text-blue-600 select-none"
+                    className={`px-6 py-3 ${cellAlign(col.align)} ${col.width} font-medium cursor-pointer hover:text-blue-600 select-none`}
                     onClick={() => toggleSort(col.key)}>
-                    <span className="flex items-center gap-1 justify-end first:justify-start">
+                    <span className="flex items-center gap-1">
                       {col.label}
                       {sort === col.key && (sortDir === 'asc' ? '↑' : '↓')}
                     </span>
@@ -171,27 +173,27 @@ export default function DashboardPage() {
                 return (
                   <tr key={h.securityId}
                       className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
-                    <td className="px-6 py-3">
+                    <td className={`px-6 py-3 ${cellAlign(COLS[0].align)}`}>
                       <div className="font-semibold text-gray-900">{h.ticker}</div>
                       <div className="text-xs text-gray-400">{h.exchange}</div>
                     </td>
-                    <td className="px-6 py-3 text-right tabular-nums text-gray-700">
+                    <td className={`px-6 py-3 ${cellAlign(COLS[1].align)} tabular-nums text-gray-700`}>
                       {h.quantity.toLocaleString()}
                     </td>
-                    <td className="px-6 py-3 text-right tabular-nums text-gray-600">
+                    <td className={`px-6 py-3 ${cellAlign(COLS[2].align)} tabular-nums text-gray-600`}>
                       {fmt(h.averageCostPerUnit, activePortfolio.baseCurrency)}
                     </td>
-                    <td className="px-6 py-3 text-right tabular-nums text-gray-700">
+                    <td className={`px-6 py-3 ${cellAlign(COLS[3].align)} tabular-nums text-gray-700`}>
                       {fmt(h.currentPrice, activePortfolio.baseCurrency)}
                     </td>
-                    <td className="px-6 py-3 text-right tabular-nums font-medium text-gray-900">
+                    <td className={`px-6 py-3 ${cellAlign(COLS[4].align)} tabular-nums font-medium text-gray-900`}>
                       {fmt(h.marketValue, activePortfolio.baseCurrency)}
                     </td>
-                    <td className={clsx('px-6 py-3 text-right tabular-nums font-medium',
+                    <td className={clsx(`px-6 py-3 ${cellAlign(COLS[5].align)} tabular-nums font-medium`,
                         pos ? 'text-emerald-600' : 'text-red-500')}>
                       {pos ? '+' : ''}{fmt(h.unrealisedGain, activePortfolio.baseCurrency)}
                     </td>
-                    <td className={clsx('px-6 py-3 text-right tabular-nums',
+                    <td className={clsx(`px-6 py-3 ${cellAlign(COLS[6].align)} tabular-nums`,
                         pos ? 'text-emerald-600' : 'text-red-500')}>
                       {pos ? '+' : ''}{pct(h.unrealisedGainPct)}
                     </td>

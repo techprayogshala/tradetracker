@@ -2,6 +2,80 @@
 
 ---
 
+## STAGE 5 CHECKPOINT (2026-04-26)
+
+**Status**: COMPLETE - Column sorting on all tables, alignment fixes
+
+**New Features (COMPLETE)**:
+- Sorting on all tables (Trades, Holdings, Open Parcels, CGT Events, Dashboard) ✅
+- Clickable column headers with sort direction indicators (↑/↓, ChevronUp/Down) ✅
+- Backend server-side sorting with `sort` and `sortDir` parameters ✅
+
+**Tables with Sorting**:
+- **Dashboard** - Holdings table (7 columns)
+- **Portfolio** - Holdings table (5 columns)
+- **Trades** - All 8 data columns (Date, Security, Type, Quantity, Price, Fees, Source)
+- **Tax** - CGT Events table (10 columns) + Open Parcels table (9 columns)
+
+**Backend Endpoints Updated**:
+- `GET /v1/portfolios/{id}/holdings?sort=field&sortDir=asc|desc`
+- `GET /v1/portfolios/{id}/trades?sort=field&sortDir=asc|desc`
+- `GET /v1/portfolios/{id}/tax/cgt-events?sort=field&sortDir=asc|desc`
+- `GET /v1/portfolios/{id}/tax/open-parcels?sort=field&sortDir=asc|desc`
+
+**Fixes Applied**:
+
+1. **TradeEventRepository.java** (`tradetracker-portfolio/.../repository/TradeEventRepository.java`):
+   - Removed hardcoded `ORDER BY t.tradeDate DESC, t.createdAt DESC` from JPQL query
+   - Was overriding dynamic sort parameter from API
+
+2. **PortfolioController.java** (`tradetracker-api/.../PortfolioController.java`):
+   - Added `sortDir` parameter to holdings and trades endpoints
+   - Trades endpoint: `PageRequest.of(page, size, Sort.by(direction, sort))`
+
+3. **PortfolioService.java** (`tradetracker-portfolio/.../service/PortfolioService.java`):
+   - Added `sortDir` parameter to `getHoldings()`
+   - Fixed comparator logic: removed `.reversed()` from all cases, apply `desc` only when sortDir="desc"
+
+4. **TaxController.java** (`tradetracker-api/.../TaxController.java`):
+   - Added `sortDir` parameter to `getCgtEvents()` and `getOpenParcels()` endpoints
+
+5. **TaxReportService.java** (`tradetracker-tax/.../TaxReportService.java`):
+   - Added `sortDir` parameter to `getCgtEvents()` and `getOpenParcels()`
+   - Fixed comparator logic for both methods (same fix as PortfolioService)
+
+6. **TradesPage.tsx** (`frontend/src/pages/TradesPage.tsx`):
+   - Fixed `sort` param format: changed from `sort: \`${sortField},${sortDir}\`` to separate params
+   - Added width and sortKey support to COLUMNS config
+   - Security column uses `sortKey: 'security.ticker'` for correct backend field
+   - Total column marked as `isCalculated: true` (non-sortable, calculated field)
+   - All columns left-aligned for consistent appearance
+
+7. **PortfolioPage.tsx** (`frontend/src/pages/PortfolioPage.tsx`):
+   - Added sort direction toggle with ↑/↓ indicators
+   - Updated `useHoldings` hook to include `sortDir` parameter
+
+8. **TaxPage.tsx** (`frontend/src/pages/TaxPage.tsx`):
+   - CGT Events table: added EVENT_COLS config with sort support
+   - Open Parcels table: added PARCEL_COLS config with sort support
+   - All columns left-aligned
+
+9. **DashboardPage.tsx** (`frontend/src/pages/DashboardPage.tsx`):
+   - Added COLS config with alignment and toggleSort function
+   - Holdings table has sorting on all 7 columns
+   - Columns properly aligned (Security left, numeric columns right)
+
+10. **usePortfolios.ts** (`frontend/src/hooks/usePortfolios.ts`):
+    - `useHoldings()` hook updated to accept `sortDir` parameter
+    - Removed staleTime/refetchOnWindowFocus to allow proper re-fetching
+
+**Column Alignment**:
+- All tables now use left-aligned columns for consistency
+- TradesPage, TaxPage (both tables), DashboardPage all left-aligned
+- PortfolioPage uses sort buttons with ↑/↓ indicators
+
+---
+
 ## STAGE 4 CHECKPOINT (2026-04-25)
 
 **Status**: COMPLETE - Edit/Delete trades feature working, Swagger working, auth flow fixed

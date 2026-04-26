@@ -162,14 +162,14 @@ const [sortField, setSortField] = useState('tradeDate')
   }
 
   const COLUMNS = [
-    { key: 'tradeDate', label: 'Date', align: 'left' },
+    { key: 'tradeDate', label: 'Date', align: 'left', sortKey: 'tradeDate' },
     { key: 'ticker', label: 'Security', align: 'left', sortKey: 'security.ticker' },
-    { key: 'tradeType', label: 'Type', align: 'left' },
-    { key: 'quantity', label: 'Quantity', align: 'right' },
-    { key: 'price', label: 'Price', align: 'right' },
-    { key: 'fees', label: 'Fees', align: 'right' },
-    { key: 'totalCost', label: 'Total', align: 'right', isCalculated: true },
-    { key: 'source', label: 'Source', align: 'left' },
+    { key: 'tradeType', label: 'Type', align: 'left', sortKey: 'tradeType' },
+    { key: 'quantity', label: 'Quantity', align: 'left', sortKey: 'quantity' },
+    { key: 'price', label: 'Price', align: 'left', sortKey: 'price' },
+    { key: 'fees', label: 'Fees', align: 'left', sortKey: 'fees' },
+    { key: 'totalCost', label: 'Total', align: 'left', isCalculated: true },
+    { key: 'source', label: 'Source', align: 'left', sortKey: 'source' },
   ]
 
   return (
@@ -250,7 +250,7 @@ const [sortField, setSortField] = useState('tradeDate')
                       <th key={col.key}
                         className={`px-5 py-3 text-${col.align} font-medium whitespace-nowrap cursor-pointer hover:text-blue-600 select-none ${col.isCalculated ? 'cursor-not-allowed opacity-50' : ''}`}
                         onClick={() => toggleSort(col)}>
-                        <span className="flex items-center gap-1 justify-between">
+                        <span className="flex items-center gap-1">
                           {col.label}
                           {!col.isCalculated && sortField === (col.sortKey ?? col.key) && (
                             sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
@@ -258,6 +258,7 @@ const [sortField, setSortField] = useState('tradeDate')
                         </span>
                       </th>
                     ))}
+                    <th className="px-5 py-3 w-16"></th>
                     <th></th>
                   </tr>
                 </thead>
@@ -341,12 +342,12 @@ function TradeRow({ trade, isSelected, onSelect, onEdit, onDelete }: {
           {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
         </button>
       </td>
-      <td className="px-5 py-3 text-gray-500 whitespace-nowrap">{format(parseISO(trade.tradeDate), 'dd MMM yyyy')}</td>
-      <td className="px-5 py-3">
+      <td className="px-5 py-3 text-left text-gray-500 whitespace-nowrap">{format(parseISO(trade.tradeDate), 'dd MMM yyyy')}</td>
+      <td className="px-5 py-3 text-left">
         <span className="font-semibold text-gray-900">{trade.ticker}</span>
         <span className="text-xs text-gray-400 ml-1">{trade.exchange}</span>
       </td>
-      <td className="px-5 py-3">
+      <td className="px-5 py-3 text-left">
         <span className={clsx('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',
           isBuy && 'bg-emerald-50 text-emerald-700',
           isSell && 'bg-red-50 text-red-600',
@@ -360,14 +361,14 @@ function TradeRow({ trade, isSelected, onSelect, onEdit, onDelete }: {
           {fmtType(trade.tradeType)}
         </span>
       </td>
-      <td className="px-5 py-3 text-right tabular-nums text-gray-700">{trade.quantity.toLocaleString()}</td>
-      <td className="px-5 py-3 text-right tabular-nums text-gray-600">{fmtCcy(trade.price, trade.currency)}</td>
-      <td className="px-5 py-3 text-right tabular-nums text-gray-500">{fmtCcy(trade.fees, trade.currency)}</td>
-      <td className="px-5 py-3 text-right tabular-nums font-medium text-gray-900">{fmtCcy(trade.totalCost, trade.currency)}</td>
-      <td className="px-5 py-3 text-right">
+      <td className="px-5 py-3 text-left tabular-nums text-gray-700">{trade.quantity.toLocaleString()}</td>
+      <td className="px-5 py-3 text-left tabular-nums text-gray-600">{fmtCcy(trade.price, trade.currency)}</td>
+      <td className="px-5 py-3 text-left tabular-nums text-gray-500">{fmtCcy(trade.fees, trade.currency)}</td>
+      <td className="px-5 py-3 text-left tabular-nums font-medium text-gray-900">{fmtCcy(trade.totalCost, trade.currency)}</td>
+      <td className="px-5 py-3 text-left">
         <span className="text-xs text-gray-400 capitalize">{trade.source.toLowerCase().replace('_', ' ')}</span>
       </td>
-      <td className="px-5 py-3 text-right">
+      <td className="px-5 py-3 w-16">
         <div className="flex items-center justify-end gap-1">
           <button onClick={onEdit} className="p-1 text-gray-400 hover:text-blue-600 rounded hover:bg-blue-50">
             <Pencil size={14} />

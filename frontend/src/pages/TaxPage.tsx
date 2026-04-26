@@ -348,15 +348,15 @@ function CgtEventsTable({ events, isLoading, sort, sortDir, onSort }: {
 
   const EVENT_COLS = [
     { key: 'ticker', label: 'Ticker', align: 'left' },
-    { key: 'disposalDate', label: 'Disposal', align: 'right' },
-    { key: 'acquisitionDate', label: 'Acquisition', align: 'right' },
-    { key: 'holdingDays', label: 'Days', align: 'right' },
-    { key: 'quantity', label: 'Quantity', align: 'right' },
-    { key: 'proceeds', label: 'Proceeds', align: 'right' },
-    { key: 'costBase', label: 'Cost Base', align: 'right' },
-    { key: 'capitalGain', label: 'Gain / Loss', align: 'right' },
-    { key: 'discountApplied', label: 'Discount', align: 'right' },
-    { key: 'assessableGain', label: 'Assessable', align: 'right' },
+    { key: 'disposalDate', label: 'Disposal', align: 'left' },
+    { key: 'acquisitionDate', label: 'Acquisition', align: 'left' },
+    { key: 'holdingDays', label: 'Days', align: 'left' },
+    { key: 'quantity', label: 'Quantity', align: 'left' },
+    { key: 'proceeds', label: 'Proceeds', align: 'left' },
+    { key: 'costBase', label: 'Cost Base', align: 'left' },
+    { key: 'capitalGain', label: 'Gain / Loss', align: 'left' },
+    { key: 'discountApplied', label: 'Discount', align: 'left' },
+    { key: 'assessableGain', label: 'Assessable', align: 'left' },
   ]
 
   return (
@@ -384,27 +384,27 @@ function CgtEventsTable({ events, isLoading, sort, sortDir, onSort }: {
               const isGain = e.capitalGain >= 0
               return (
                 <tr key={i} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/40">
-                  <td className="px-4 py-3 font-semibold text-gray-900">{e.ticker}</td>
-                  <td className="px-4 py-3 text-right text-gray-500 whitespace-nowrap">
+                  <td className="px-4 py-3 text-left font-semibold text-gray-900">{e.ticker}</td>
+                  <td className="px-4 py-3 text-left text-gray-500 whitespace-nowrap">
                     {format(parseISO(e.disposalDate), 'dd MMM yyyy')}
                   </td>
-                  <td className="px-4 py-3 text-right text-gray-400 whitespace-nowrap">
+                  <td className="px-4 py-3 text-left text-gray-400 whitespace-nowrap">
                     {format(parseISO(e.acquisitionDate), 'dd MMM yyyy')}
                   </td>
-                  <td className="px-4 py-3 text-right text-gray-400">{e.holdingDays}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-gray-600">{e.quantity.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-gray-700">{fmtCcy(e.proceeds)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-gray-600">{fmtCcy(e.costBase)}</td>
-                  <td className={clsx('px-4 py-3 text-right tabular-nums font-medium',
+                  <td className="px-4 py-3 text-left text-gray-400">{e.holdingDays}</td>
+                  <td className="px-4 py-3 text-left tabular-nums text-gray-600">{e.quantity.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-left tabular-nums text-gray-700">{fmtCcy(e.proceeds)}</td>
+                  <td className="px-4 py-3 text-left tabular-nums text-gray-600">{fmtCcy(e.costBase)}</td>
+                  <td className={clsx('px-4 py-3 text-left tabular-nums font-medium',
                     isGain ? 'text-emerald-600' : 'text-red-500')}>
                     {isGain ? '+' : ''}{fmtCcy(e.capitalGain)}
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-left">
                     {e.discountApplied
                       ? <span className="inline-block px-1.5 py-0.5 text-xs bg-emerald-50 text-emerald-700 rounded">50%</span>
                       : <span className="text-gray-300">—</span>}
                   </td>
-                  <td className={clsx('px-4 py-3 text-right tabular-nums font-semibold',
+                  <td className={clsx('px-4 py-3 text-left tabular-nums font-semibold',
                     e.assessableGain >= 0 ? 'text-gray-900' : 'text-red-500')}>
                     {fmtCcy(e.assessableGain)}
                   </td>
@@ -436,14 +436,14 @@ function OpenParcelsTable({ parcels, isLoading, sort, sortDir, onSort }: {
 
   const PARCEL_COLS = [
     { key: 'ticker', label: 'Ticker', align: 'left' },
-    { key: 'quantity', label: 'Quantity', align: 'right' },
-    { key: 'costPerUnit', label: 'Cost/Unit', align: 'right' },
-    { key: 'totalCostBase', label: 'Cost Base', align: 'right' },
-    { key: 'acquisitionDate', label: 'Acquired', align: 'right' },
-    { key: 'holdingDays', label: 'Days', align: 'right' },
-    { key: 'cgtDiscountEligible', label: 'Discount', align: 'right' },
-    { key: 'currentPrice', label: 'Current Price', align: 'right' },
-    { key: 'unrealisedGain', label: 'Unrealised', align: 'right' },
+    { key: 'quantity', label: 'Quantity', align: 'left' },
+    { key: 'costPerUnit', label: 'Cost/Unit', align: 'left' },
+    { key: 'totalCostBase', label: 'Cost Base', align: 'left' },
+    { key: 'acquisitionDate', label: 'Acquired', align: 'left' },
+    { key: 'holdingDays', label: 'Days', align: 'left' },
+    { key: 'cgtDiscountEligible', label: 'Discount', align: 'left' },
+    { key: 'currentPrice', label: 'Current Price', align: 'left' },
+    { key: 'unrealisedGain', label: 'Unrealised', align: 'left' },
   ]
 
   return (
@@ -475,23 +475,23 @@ function OpenParcelsTable({ parcels, isLoading, sort, sortDir, onSort }: {
               const pos = p.unrealisedGain >= 0
               return (
                 <tr key={p.parcelId} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/40">
-                  <td className="px-4 py-3 font-semibold text-gray-900">{p.ticker}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-gray-700">{p.quantity.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-gray-600">{fmtCcy(p.costPerUnit)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-gray-700">{fmtCcy(p.totalCostBase)}</td>
-                  <td className="px-4 py-3 text-right text-gray-500 whitespace-nowrap">
+                  <td className="px-4 py-3 text-left font-semibold text-gray-900">{p.ticker}</td>
+                  <td className="px-4 py-3 text-left tabular-nums text-gray-700">{p.quantity.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-left tabular-nums text-gray-600">{fmtCcy(p.costPerUnit)}</td>
+                  <td className="px-4 py-3 text-left tabular-nums text-gray-700">{fmtCcy(p.totalCostBase)}</td>
+                  <td className="px-4 py-3 text-left text-gray-500 whitespace-nowrap">
                     {format(parseISO(p.acquisitionDate), 'dd MMM yyyy')}
                   </td>
-                  <td className="px-4 py-3 text-right text-gray-400">{p.holdingDays}</td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-left text-gray-400">{p.holdingDays}</td>
+                  <td className="px-4 py-3 text-left">
                     {p.cgtDiscountEligible
                       ? <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs bg-emerald-50 text-emerald-700 rounded">
                           <Shield size={9} /> Eligible
                         </span>
                       : <span className="text-xs text-gray-400">{365 - p.holdingDays}d to go</span>}
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-gray-700">{fmtCcy(p.currentPrice)}</td>
-                  <td className={clsx('px-4 py-3 text-right tabular-nums font-medium',
+                  <td className="px-4 py-3 text-left tabular-nums text-gray-700">{fmtCcy(p.currentPrice)}</td>
+                  <td className={clsx('px-4 py-3 text-left tabular-nums font-medium',
                     pos ? 'text-emerald-600' : 'text-red-500')}>
                     {pos ? '+' : ''}{fmtCcy(p.unrealisedGain)}
                     <span className="text-xs ml-1 opacity-70">
