@@ -29,12 +29,12 @@ export function usePortfolio(portfolioId) {
     });
 }
 // ── Holdings ──────────────────────────────────────────────────────────────────
-export function useHoldings(portfolioId, sort = 'ticker', sortDir = 'asc') {
+export function useHoldings(portfolioId, sort = 'ticker', sortDir = 'asc', includeDisposed = false) {
     return useQuery({
-        queryKey: ['holdings', portfolioId, sort, sortDir],
+        queryKey: ['holdings', portfolioId, sort, sortDir, includeDisposed],
         queryFn: async () => {
             const res = await api.get(`/v1/portfolios/${portfolioId}/holdings`, {
-                params: { sort, sortDir }
+                params: { sort, sortDir, includeDisposed }
             });
             return res.data;
         },

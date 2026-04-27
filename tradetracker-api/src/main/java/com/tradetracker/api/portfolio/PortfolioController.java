@@ -112,8 +112,9 @@ public class PortfolioController {
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID portfolioId,
             @RequestParam(defaultValue = "ticker") String sort,
-            @RequestParam(defaultValue = "asc") String sortDir) {
-        return svc.getHoldings(jwt.getSubject(), portfolioId, sort, sortDir);
+            @RequestParam(defaultValue = "asc") String sortDir,
+            @RequestParam(defaultValue = "false") boolean includeDisposed) {
+        return svc.getHoldings(jwt.getSubject(), portfolioId, sort, sortDir, includeDisposed);
     }
 
     // ── Trades ────────────────────────────────────────────────────────────────

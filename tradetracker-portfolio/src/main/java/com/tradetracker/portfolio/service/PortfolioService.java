@@ -189,11 +189,15 @@ public class PortfolioService {
      */
     @Transactional(readOnly = true)
     // @Cacheable(value = "holdings", key = "#portfolioId") // Disabled - causes Jackson deserialization issues
-    public List<HoldingView> getHoldings(String keycloakSub, UUID portfolioId, String sort, String sortDir) {
+    public List<HoldingView> getHoldings(String keycloakSub, UUID portfolioId, String sort, String sortDir, boolean includeDisposed) {
         requirePortfolio(keycloakSub, portfolioId);
 
+        // Get all parcels - if includeDisposed is false, filter to only those with remaining quantity
         List<TaxParcelRepository.HoldingAggregation> aggregations =
-            parcelRepo.aggregateHoldings(portfolioId);
+            includeDisposed ? parcelRepo.aggregateHoldings(portfolioId)
+                           : parcelRepo.aggregateHoldings(portfolioId).stream()
+                               .filter(a -> a.getTotalQuantity().compareTo(BigDecimal.ZERO) > 0)
+                               .toList();
 
         if (aggregations.isEmpty()) return List.of();
 
@@ -527,7 +531,7 @@ public class PortfolioService {
     // ── Portfolio summary ────────────────────────────────────────────────────
 
     private PortfolioSummary toSummary(Portfolio p) {
-        List<HoldingView> holdings = self.getHoldings(p.getUser().getKeycloakSub(), p.getId(), "ticker", "asc");
+        List<HoldingView> holdings = self.getHoldings(p.getUser().getKeycloakSub(), p.getId(), "ticker", "asc", false);
         BigDecimal totalValue    = holdings.stream().map(HoldingView::marketValue)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal totalCostBase = holdings.stream().map(HoldingView::costBase)

@@ -50,8 +50,9 @@ export default function PortfolioPage() {
   const [selected, setSelected] = useState<string | null>(null)
   const [sort, setSort] = useState('ticker')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [showSold, setShowSold] = useState(false)
 
-  const { data: holdings = [], isLoading } = useHoldings(portfolioId, sort, sortDir)
+  const { data: holdings = [], isLoading } = useHoldings(portfolioId, sort, sortDir, showSold)
   const { data: allParcels = [] }          = useOpenParcels(portfolioId)
 
   const HOLDING_COLS = [
@@ -107,12 +108,23 @@ export default function PortfolioPage() {
 
       <div className="flex gap-5">
         {/* Holdings list */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1">
           <div className="bg-white rounded-xl border border-gray-200">
             <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-              <span className="text-sm font-semibold text-gray-700">
-                {holdings.length} position{holdings.length !== 1 ? 's' : ''}
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-semibold text-gray-700">
+                  {holdings.length} position{holdings.length !== 1 ? 's' : ''}
+                </span>
+                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showSold}
+                    onChange={e => setShowSold(e.target.checked)}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-gray-500">Show sold</span>
+                </label>
+              </div>
               <div className="flex items-center gap-2 text-xs">
                 <span className="text-gray-400">Sort:</span>
                 {HOLDING_COLS.map(col => (

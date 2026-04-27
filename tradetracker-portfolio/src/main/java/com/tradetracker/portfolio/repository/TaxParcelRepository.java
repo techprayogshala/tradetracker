@@ -65,16 +65,16 @@ public interface TaxParcelRepository extends JpaRepository<TaxParcel, UUID> {
             @Param("fyEnd") LocalDate fyEnd
     );
 
-    /**
+/**
      * Sum of remaining quantity per security — used to build the holdings view.
+     * If includeDisposed is true, includes securities with zero remaining (fully sold).
      */
     @Query("""
-            SELECT p.security.id       AS securityId,
-                   SUM(p.quantityRemaining) AS totalQuantity,
-                   SUM(p.costPerUnit * p.quantityRemaining) AS totalCostBase
+            SELECT p.security.id AS securityId,
+                   COALESCE(SUM(p.quantityRemaining), 0) AS totalQuantity,
+                   COALESCE(SUM(p.costPerUnit * p.quantityRemaining), 0) AS totalCostBase
             FROM TaxParcel p
-            WHERE p.portfolio.id  = :portfolioId
-              AND p.fullyDisposed = false
+            WHERE p.portfolio.id = :portfolioId
             GROUP BY p.security.id
             """)
     List<HoldingAggregation> aggregateHoldings(@Param("portfolioId") UUID portfolioId);

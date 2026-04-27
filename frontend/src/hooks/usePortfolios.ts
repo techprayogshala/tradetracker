@@ -132,12 +132,12 @@ export function usePortfolio(portfolioId: string | undefined) {
 
 // ── Holdings ──────────────────────────────────────────────────────────────────
 
-export function useHoldings(portfolioId: string | undefined, sort = 'ticker', sortDir = 'asc') {
+export function useHoldings(portfolioId: string | undefined, sort = 'ticker', sortDir = 'asc', includeDisposed = false) {
   return useQuery({
-    queryKey: ['holdings', portfolioId, sort, sortDir],
+    queryKey: ['holdings', portfolioId, sort, sortDir, includeDisposed],
     queryFn: async () => {
       const res = await api.get<Holding[]>(`/v1/portfolios/${portfolioId}/holdings`, {
-        params: { sort, sortDir }
+        params: { sort, sortDir, includeDisposed }
       })
       return res.data
     },
